@@ -1,0 +1,18 @@
+Name:                sr-cache
+Version:             1.0
+Synopsis:            Safe dynamic caching
+License:             BSD3
+License-file:        LICENSE
+Copyright:           Copyright (c) 2022 David Fox
+Author:              David Fox
+Maintainer:          dsf@seereason.com
+Stability:           experimental
+Homepage:            http://github.com/seereason/sr-cache
+Tested-With:         GHC ==8.6.5
+Build-Type:          Simple
+Cabal-Version:       >= 1.10
+
+Library
+  Build-Depends: base, containers, lens, HUnit
+  Exposed-Modules: Data.Cache
+  Hs-Source-Dirs: src
