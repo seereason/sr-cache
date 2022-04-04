@@ -21,13 +21,14 @@ module Data.Cache
   ) where
 
 import Control.Lens (at, Iso', iso, Lens', ReifiedLens', ReifiedLens(Lens))
-import Data.Dynamic (Dynamic, fromDynamic, toDyn)
+import Data.Dynamic
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(Proxy))
-import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
+import Data.Typeable (Typeable, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Stack (HasCallStack)
+import Type.Reflection
 
 import Control.Lens (set, view)
 import Data.Map.Strict (fromList)
@@ -37,7 +38,7 @@ import Test.HUnit
 -- value.  The internals of this ought be hidden to preserve the
 -- constraint that this is an Iso between a type and a single value
 -- of that type.
-type CacheMaps = Map Fingerprint Dynamic
+type CacheMaps = Map SomeTypeRep Dynamic
 
 -- | How to find the 'CacheMaps' value.
 class HasDynamicCache a where dynamicCache :: Lens' a CacheMaps
@@ -52,11 +53,11 @@ dynamicLens d =
   l1 . l2 . l3
   where
     l1 :: Lens' CacheMaps (Maybe Dynamic)
-    l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
+    l1 = at (someTypeRep (Proxy @a))
     l2 :: Iso' (Maybe Dynamic) Dynamic
     l2 = iso (maybe (toDyn d) id) Just
     l3 :: Iso' Dynamic a
-    l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep (Proxy @a)))) . fromDynamic) toDyn
+    l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep @a))) . fromDynamic) toDyn
 
 class (HasDynamicCache s, Typeable a) => AnyLens s a where
   anyLens :: HasCallStack => a -> Lens' s a
