@@ -25,8 +25,7 @@ import Data.Dynamic
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(Proxy))
-import Data.Typeable (Typeable, typeRepFingerprint)
-import GHC.Fingerprint (Fingerprint(..))
+import Data.Typeable (Typeable)
 import GHC.Stack (HasCallStack)
 import Type.Reflection
 
