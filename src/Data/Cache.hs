@@ -21,7 +21,7 @@ module Data.Cache
   , tests
   ) where
 
-import Control.Lens (at, Iso', iso, Lens', ReifiedLens', ReifiedLens(Lens))
+import Control.Lens (at, Iso', iso, _Just, Lens', ReifiedLens', ReifiedLens(Lens), Traversal')
 import Data.Dynamic
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
@@ -83,7 +83,7 @@ instance (HasDynamicCache s, Ord k, Typeable k, Typeable v) => HasMap k v s wher
     k' <- k
     pure $ Lens $ atLens k'
 
-ixLens :: (HasDynamicCache s, Ord k, Typeable k, Typeable v) => k -> Traversal' s v
+ixLens :: forall k v s. (HasDynamicCache s, Ord k, Typeable k, Typeable v) => k -> Traversal' s v
 ixLens k = atLens k . _Just
 
 tests :: Test
