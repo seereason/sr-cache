@@ -17,6 +17,7 @@ module Data.Cache
   , mapLens
   , atLens
   , atLensM
+  , ixLens
   , tests
   ) where
 
@@ -81,6 +82,9 @@ instance (HasDynamicCache s, Ord k, Typeable k, Typeable v) => HasMap k v s wher
   atLensM k = do
     k' <- k
     pure $ Lens $ atLens k'
+
+ixLens :: (HasDynamicCache s, Ord k, Typeable k, Typeable v) => k -> Traversal' s v
+ixLens k = atLens k . _Just
 
 tests :: Test
 tests =
