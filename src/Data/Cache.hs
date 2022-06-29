@@ -19,6 +19,7 @@ module Data.Cache
   , mapLens
   , atLens
   , atLensM
+  , ixLens
   -- * Non-generic (overridable) lens classes
   , HasLens(hasLens)
   , HasCache(cacheLens, valueLens, valueLensM)
@@ -26,15 +27,15 @@ module Data.Cache
   , tests
   ) where
 
-import Control.Lens (at, Iso', iso, Lens', ReifiedLens', ReifiedLens(Lens))
+import Control.Lens (at, Iso', iso, _Just, Lens', ReifiedLens', ReifiedLens(Lens), Traversal')
 import Data.Default (Default(def))
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(Proxy))
-import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
-import GHC.Fingerprint (Fingerprint(..))
+import Data.Typeable (Typeable)
 import GHC.Stack (HasCallStack)
+import Type.Reflection
 
 import Control.Lens (set, view)
 import Data.Map.Strict (fromList)
@@ -44,7 +45,7 @@ import Test.HUnit
 -- value.  The internals of this ought be hidden to preserve the
 -- constraint that this is an Iso between a type and a single value
 -- of that type.
-type CacheMaps = Map Fingerprint Dynamic
+type CacheMaps = Map SomeTypeRep Dynamic
 
 -- | How to find the 'CacheMaps' value.
 class HasDynamicCache a where dynamicCache :: Lens' a CacheMaps
@@ -59,11 +60,11 @@ dynamicLens d =
   l1 . l2 . l3
   where
     l1 :: Lens' CacheMaps (Maybe Dynamic)
-    l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
+    l1 = at (someTypeRep (Proxy @a))
     l2 :: Iso' (Maybe Dynamic) Dynamic
     l2 = iso (maybe (toDyn d) id) Just
     l3 :: Iso' Dynamic a
-    l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep (Proxy @a)))) . fromDynamic) toDyn
+    l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep @a))) . fromDynamic) toDyn
 
 -- | Generic lens, allows access to a single @a@ inside a value @s2.
 -- This and other classes in this module are used to break import
@@ -98,6 +99,9 @@ instance (AnyLens s (Map k v), Ord k) => HasMap k v s where
   atLensM k = do
     k' <- k
     pure $ Lens $ atLens k'
+
+ixLens :: forall k v s. HasMap k v s => k -> Traversal' s v
+ixLens k = atLens k . _Just
 
 tests :: Test
 tests =
