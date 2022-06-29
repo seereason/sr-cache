@@ -1,3 +1,4 @@
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -12,11 +13,16 @@ module Data.Cache
   ( HasDynamicCache(dynamicCache)
   , CacheMaps
   , dynamicLens
-  , mayLens
+  -- * Generic lens classes
   , anyLens
+  , mayLens
   , mapLens
   , atLens
   , atLensM
+  -- * Non-generic (overridable) lens classes
+  , HasLens(hasLens)
+  , HasCache(cacheLens, valueLens, valueLensM)
+  -- * Tests
   , tests
   ) where
 
@@ -58,24 +64,34 @@ dynamicLens d =
     l3 :: Iso' Dynamic a
     l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep (Proxy @a)))) . fromDynamic) toDyn
 
+-- | Generic lens, allows access to a single @a@ inside a value @s2.
+-- This and other classes in this module are used to break import
+-- cycles by allowing the use of s without actually having its
+-- declaration.
 class (HasDynamicCache s, Typeable a) => AnyLens s a where
   anyLens :: HasCallStack => a -> Lens' s a
 
+-- | The generic instance of 'AnyLens'.
 instance (HasDynamicCache s, Typeable a) => AnyLens s a where
   anyLens a = dynamicCache @s . dynamicLens a
 
+-- | Generic 'Maybe' lens
 class AtLens s a where
   mayLens :: Lens' s (Maybe a)
 
+-- | Generic instance of 'AtLens'.
 instance AnyLens s (Maybe a) => AtLens s a where
   mayLens = anyLens @s @(Maybe a) Nothing
 
-class Ord k => HasMap k v s where
+-- | Generic 'Map' lens.
+class (AnyLens s (Map k v), Ord k) => HasMap k v s where
   mapLens :: HasCallStack => Lens' s (Map k v)
   atLens :: HasCallStack => k -> Lens' s (Maybe v)
+  -- ^ Accees an element of a map
   atLensM :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
 
-instance (HasDynamicCache s, Ord k, Typeable k, Typeable v) => HasMap k v s where
+-- | Generic instance of 'HasMap'.
+instance (AnyLens s (Map k v), Ord k) => HasMap k v s where
   mapLens = anyLens mempty
   atLens k = mapLens . at k
   atLensM k = do
@@ -92,3 +108,29 @@ tests =
      , TestCase (assertEqual "c" (Just 5) (view (atLens @Char @Int 'b') m2))
      , TestCase (assertEqual "d" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
      , TestCase (assertEqual "e" Nothing (view (atLens @Char @Int 'x') m2)) ]
+
+-- | Like 'AnyLens', but with a default signature so it can be
+-- overridden.  The downside is that you need to declare an instance
+-- for each pair of types.
+class HasLens s a where
+  hasLens :: a -> Lens' s a
+  default hasLens :: (AnyLens s a, Typeable a) => a -> Lens' s a
+  hasLens = anyLens
+
+-- | Like HasMap, but with no generic instance and with default method
+-- implementations which can be overridden.
+class Ord k => HasCache k v s where
+  cacheLens :: HasCallStack => Lens' s (Map k v)
+  default cacheLens :: (HasMap k v s, HasCallStack) => Lens' s (Map k v)
+  cacheLens = mapLens
+  valueLens :: (HasMap k v s, HasCallStack) => k -> Lens' s (Maybe v)
+  valueLens = atLens
+  valueLensM :: (HasMap k v s, Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
+  valueLensM k = do
+    k' <- k
+    pure $ Lens $ atLens k'
+
+instance Ord k => HasCache k v (Map k v) where cacheLens = id
+
+cacheMaps :: HasLens s CacheMaps => Lens' s CacheMaps
+cacheMaps = hasLens mempty
