@@ -123,14 +123,15 @@ class Ord k => HasCache k v s where
   cacheLens :: HasCallStack => Lens' s (Map k v)
   default cacheLens :: (HasMap k v s, HasCallStack) => Lens' s (Map k v)
   cacheLens = mapLens
-  valueLens :: (HasMap k v s, HasCallStack) => k -> Lens' s (Maybe v)
-  valueLens = atLens
-  valueLensM :: (HasMap k v s, Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
+  valueLens :: HasCallStack => k -> Lens' s (Maybe v)
+  valueLens k = cacheLens . at k
+  valueLensM :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
   valueLensM k = do
     k' <- k
-    pure $ Lens $ atLens k'
+    pure $ Lens $ valueLens k'
 
-instance Ord k => HasCache k v (Map k v) where cacheLens = id
+instance Ord k => HasCache k v (Map k v) where
+  cacheLens = id
 
 cacheMaps :: HasLens s CacheMaps => Lens' s CacheMaps
 cacheMaps = hasLens mempty
