@@ -13,7 +13,7 @@ Build-Type:          Simple
 Cabal-Version:       >= 1.10
 
 Library
-  Build-Depends: base, containers, lens, HUnit
+  Build-Depends: base, containers, data-default, lens, HUnit
   Exposed-Modules: Data.Cache
   Hs-Source-Dirs: src
 

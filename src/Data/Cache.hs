@@ -27,6 +27,7 @@ module Data.Cache
   ) where
 
 import Control.Lens (at, Iso', iso, Lens', ReifiedLens', ReifiedLens(Lens))
+import Data.Default (Default(def))
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
@@ -113,9 +114,9 @@ tests =
 -- overridden.  The downside is that you need to declare an instance
 -- for each pair of types.
 class HasLens s a where
-  hasLens :: a -> Lens' s a
-  default hasLens :: (AnyLens s a, Typeable a) => a -> Lens' s a
-  hasLens = anyLens
+  hasLens :: Lens' s a
+  default hasLens :: (AnyLens s a, Default a, Typeable a) => Lens' s a
+  hasLens = anyLens def
 
 -- | Like HasMap, but with no generic instance and with default method
 -- implementations which can be overridden.
@@ -134,4 +135,4 @@ instance Ord k => HasCache k v (Map k v) where
   cacheLens = id
 
 cacheMaps :: HasLens s CacheMaps => Lens' s CacheMaps
-cacheMaps = hasLens mempty
+cacheMaps = hasLens
