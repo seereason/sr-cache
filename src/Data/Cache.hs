@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Data.Cache
+module Data.Cache {-# DEPRECATED "Use Data.GenericCache" #-}
   ( HasDynamicCache(dynamicCache)
   , CacheMaps
   , dynamicLens
