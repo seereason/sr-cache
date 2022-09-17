@@ -19,17 +19,21 @@ module Data.GenericCache
     -- * Lens functions
   , anyLens
   , maybeLens
+  , defaultLens
     -- * Map lens functions
   , atLens
   , mapLens
   , ixLens
   , boundedLens
   , monoidLens
+    -- * Non-generic lens
+  , HasLens(hasLens)
     -- * Tests
   , tests
   ) where
 
 import Control.Lens (At(at), Index, IxValue, Iso', iso, _Just, Lens', non, Traversal')
+import Data.Default (Default(def))
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
@@ -80,6 +84,10 @@ anyLens a = genericCache @s . dynamicLens a
 -- | 'anyLens' for a 'Maybe' value, with default value 'Nothing'.
 maybeLens :: forall a s. (HasGenericCache s, Typeable a) => Lens' s (Maybe a)
 maybeLens = anyLens @(Maybe a) @s Nothing
+
+-- | 'anyLens' for a value with a 'Default' instance.
+defaultLens :: forall a s. (HasGenericCache s, Typeable a, Default a) => Lens' s a
+defaultLens = anyLens @a @s def
 
 type AtLens map s =
   (HasGenericCache s,
@@ -149,6 +157,11 @@ monoidLens ::
   => k
   -> Lens' s v
 monoidLens k = atLens @map k . non (mempty :: v)
+
+-- | If you don't want to use the 'GenericCache' because you already
+-- have a place to store location for a type, declare a 'HasLens' instance.
+class HasLens s a where
+  hasLens :: Lens' s a
 
 -- runTestTT tests
 tests :: Test
