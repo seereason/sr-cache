@@ -1,3 +1,6 @@
+-- | Compatibility module.
+
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -8,12 +11,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS -Wall #-}
 
-module Data.Cache {-# DEPRECATED "Use Data.GenericCache" #-}
-  ( HasDynamicCache(dynamicCache)
-  , CacheMaps
-  , dynamicLens
-  -- * Generic lens classes
+module Data.Cache
+  ( HasDynamicCache
   , anyLens
   , mayLens
   , mapLens
@@ -27,63 +28,36 @@ module Data.Cache {-# DEPRECATED "Use Data.GenericCache" #-}
   , tests
   ) where
 
-import Control.Lens (at, Iso', iso, _Just, Lens', ReifiedLens', ReifiedLens(Lens), Traversal')
+import Control.Lens (at, _Just, Lens', ReifiedLens', ReifiedLens(Lens), Traversal')
+import Control.Lens (set, view)
 import Data.Default (Default(def))
-import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.Map.Strict (Map)
-import Data.Maybe (fromMaybe)
-import Data.Proxy (Proxy(Proxy))
+import Data.Map.Strict (fromList)
 import Data.Typeable (Typeable)
 import GHC.Stack (HasCallStack)
-import Type.Reflection
-
-import Control.Lens (set, view)
-import Data.Map.Strict (fromList)
 import Test.HUnit
+import qualified Data.GenericCache as New
 
--- | A map from type fingerprint values to wrapped types of that
--- value.  The internals of this ought be hidden to preserve the
--- constraint that this is an Iso between a type and a single value
--- of that type.
-type CacheMaps = Map SomeTypeRep Dynamic
-
--- | How to find the 'CacheMaps' value.
-class HasDynamicCache a where dynamicCache :: Lens' a CacheMaps
-instance HasDynamicCache CacheMaps where dynamicCache = id
-
--- | Given a default, build a lens that points into 'CacheMaps' to a
--- value of any Typeable a.  The value is initially d.
-dynamicLens ::
-  forall a. (Typeable a, HasCallStack)
-  => a -> Lens' CacheMaps a
-dynamicLens d =
-  l1 . l2 . l3
-  where
-    l1 :: Lens' CacheMaps (Maybe Dynamic)
-    l1 = at (someTypeRep (Proxy @a))
-    l2 :: Iso' (Maybe Dynamic) Dynamic
-    l2 = iso (maybe (toDyn d) id) Just
-    l3 :: Iso' Dynamic a
-    l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep @a))) . fromDynamic) toDyn
+type HasDynamicCache = New.HasGenericCache
 
 -- | Generic lens, allows access to a single @a@ inside a value @s2.
 -- This and other classes in this module are used to break import
 -- cycles by allowing the use of s without actually having its
 -- declaration.
-class (HasDynamicCache s, Typeable a) => AnyLens s a where
+class (New.HasGenericCache s, Typeable a) => AnyLens s a where
   anyLens :: HasCallStack => a -> Lens' s a
 
 -- | The generic instance of 'AnyLens'.
-instance (HasDynamicCache s, Typeable a) => AnyLens s a where
-  anyLens a = dynamicCache @s . dynamicLens a
+instance (New.HasGenericCache s, Typeable a) => AnyLens s a where
+  anyLens = New.anyLens
 
 -- | Generic 'Maybe' lens
 class AtLens s a where
   mayLens :: Lens' s (Maybe a)
 
 -- | Generic instance of 'AtLens'.
-instance AnyLens s (Maybe a) => AtLens s a where
-  mayLens = anyLens @s @(Maybe a) Nothing
+instance (AnyLens s (Maybe a), Typeable a) => AtLens s a where
+  mayLens = New.maybeLens
 
 -- | Generic 'Map' lens.
 class (AnyLens s (Map k v), Ord k) => HasMap k v s where
@@ -93,9 +67,9 @@ class (AnyLens s (Map k v), Ord k) => HasMap k v s where
   atLensM :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
 
 -- | Generic instance of 'HasMap'.
-instance (AnyLens s (Map k v), Ord k) => HasMap k v s where
-  mapLens = anyLens mempty
-  atLens k = mapLens . at k
+instance (AnyLens s (Map k v), Ord k, Typeable k, Typeable v) => HasMap k v s where
+  mapLens = New.mapLens @(Map k v)
+  atLens = New.atLens @(Map k v)
   atLensM k = do
     k' <- k
     pure $ Lens $ atLens k'
@@ -105,7 +79,7 @@ ixLens k = atLens k . _Just
 
 tests :: Test
 tests =
-  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (mempty :: CacheMaps)
+  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (mempty :: New.GenericCache)
       m2 = set (mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
   in TestList
      [ TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
@@ -137,6 +111,3 @@ class Ord k => HasCache k v s where
 
 instance Ord k => HasCache k v (Map k v) where
   cacheLens = id
-
-cacheMaps :: HasLens s CacheMaps => Lens' s CacheMaps
-cacheMaps = hasLens
