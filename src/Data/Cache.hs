@@ -22,7 +22,7 @@ module Data.Cache
   , atLensM
   , ixLens
   -- * Non-generic (overridable) lens classes
-  , HasLens(hasLens)
+  , New.HasLens(New.hasLens)
   , HasCache(cacheLens, valueLens, valueLensM)
   -- * Tests
   , tests
@@ -87,14 +87,6 @@ tests =
      , TestCase (assertEqual "c" (Just 5) (view (atLens @Char @Int 'b') m2))
      , TestCase (assertEqual "d" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
      , TestCase (assertEqual "e" Nothing (view (atLens @Char @Int 'x') m2)) ]
-
--- | Like 'AnyLens', but with a default signature so it can be
--- overridden.  The downside is that you need to declare an instance
--- for each pair of types.
-class HasLens s a where
-  hasLens :: Lens' s a
-  default hasLens :: (AnyLens s a, Default a, Typeable a) => Lens' s a
-  hasLens = anyLens def
 
 -- | Like HasMap, but with no generic instance and with default method
 -- implementations which can be overridden.
