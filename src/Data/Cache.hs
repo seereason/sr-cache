@@ -14,13 +14,17 @@
 {-# OPTIONS -Wall #-}
 
 module Data.Cache
-  ( HasDynamicCache
+  ( New.DynamicCache
+  , New.HasDynamicCache(dynamicCache)
   , anyLens
   , mayLens
   , mapLens
   , atLens
   , atLensM
   , ixLens
+  , New.boundedLens
+  , New.defaultLens
+  , New.monoidLens
   -- * Non-generic (overridable) lens classes
   , New.HasLens(New.hasLens)
   , HasCache(cacheLens, valueLens, valueLensM)
@@ -30,7 +34,6 @@ module Data.Cache
 
 import Control.Lens (at, _Just, Lens', ReifiedLens', ReifiedLens(Lens), Traversal')
 import Control.Lens (set, view)
-import Data.Default (Default(def))
 import Data.Map.Strict (Map)
 import Data.Map.Strict (fromList)
 import Data.Typeable (Typeable)
@@ -38,17 +41,15 @@ import GHC.Stack (HasCallStack)
 import Test.HUnit
 import qualified Data.GenericCache as New
 
-type HasDynamicCache = New.HasGenericCache
-
 -- | Generic lens, allows access to a single @a@ inside a value @s2.
 -- This and other classes in this module are used to break import
 -- cycles by allowing the use of s without actually having its
 -- declaration.
-class (New.HasGenericCache s, Typeable a) => AnyLens s a where
+class (New.HasDynamicCache s, Typeable a) => AnyLens s a where
   anyLens :: HasCallStack => a -> Lens' s a
 
 -- | The generic instance of 'AnyLens'.
-instance (New.HasGenericCache s, Typeable a) => AnyLens s a where
+instance (New.HasDynamicCache s, Typeable a) => AnyLens s a where
   anyLens = New.anyLens
 
 -- | Generic 'Maybe' lens
@@ -79,7 +80,7 @@ ixLens k = atLens k . _Just
 
 tests :: Test
 tests =
-  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (mempty :: New.GenericCache)
+  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (mempty :: New.DynamicCache)
       m2 = set (mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
   in TestList
      [ TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))

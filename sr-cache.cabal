@@ -1,5 +1,5 @@
 Name:                sr-cache
-Version:             1.4
+Version:             1.5
 Synopsis:            Safe dynamic caching
 License:             BSD3
 License-file:        LICENSE
@@ -14,8 +14,9 @@ Cabal-Version:       >= 1.10
 
 Library
   Build-Depends: base, containers, data-default, lens, HUnit
-  Exposed-Modules: Data.Cache Data.GenericCache
+  Exposed-Modules: Data.Cache
   Hs-Source-Dirs: src
+  Other-Modules: Data.GenericCache
 
 Test-Suite cache-tests
   default-language: Haskell2010
