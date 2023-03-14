@@ -47,7 +47,7 @@ import GHC.Generics
 import GHC.Stack (HasCallStack)
 import Test.HUnit
 import Type.Reflection
-
+
 -- | A map from a type fingerprint ('SomeTypeRep') to a wrapped value ('Dynamic') of that type.
 newtype DynamicCache = DynamicCache (Map SomeTypeRep Dynamic) deriving (Generic, Monoid, Semigroup)
 
@@ -72,7 +72,7 @@ dynamicLens d =
     l3 :: Iso' Dynamic a
     l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep @a))) . fromDynamic) toDyn
 {-# INLINE dynamicLens #-}
-
+
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
 --
@@ -94,10 +94,6 @@ class (HasDynamicCache s, Typeable a) => AnyLens s a where
 instance (HasDynamicCache s, Typeable a) => AnyLens s a where
   anyLens = anyLens'
 
--- | 'anyLens' for a 'Maybe' value, with default value 'Nothing'.
-maybeLens' :: forall a s. (HasDynamicCache s, Typeable a) => Lens' s (Maybe a)
-maybeLens' = anyLens' @(Maybe a) @s Nothing
-
 -- | Generic 'Maybe' lens
 class MaybeLens s a where
   maybeLens :: Lens' s (Maybe a)
@@ -106,59 +102,9 @@ class MaybeLens s a where
 instance (AnyLens s (Maybe a), Typeable a) => MaybeLens s a where
   maybeLens = maybeLens'
 
--- | Access the whole map that 'atLens' provides element access to:
---
--- @
---     > view (mapLens \@Char \@String) $
---         atLens \'x\' .~ Just "hello" $
---           atLens \'y\' .~ Just "world" $
---             (mempty :: DynamicCache)
---     fromList [(\'x\',"hello"),(\'y\',"world")]
--- @
-mapLens' ::
-  forall map s.
-  (AtLens' map s,
-   HasCallStack)
-  => Lens' s map
-mapLens' = anyLens' mempty
-
-type AtLens' map s =
-  (HasDynamicCache s,
-   At map,
-   Typeable map,
-   Monoid map,
-   Typeable (Index map),
-   Ord (Index map),
-   Typeable (IxValue map))
-
--- | An 'At' lens to an element of a map.
-atLens' ::
-  forall map k v s.
-  (AtLens' map s,
-   k ~ Index map,
-   v ~ IxValue map,
-   HasCallStack)
-  => k
-  -> Lens' s (Maybe v)
-atLens' k = mapLens' @map . at k
-
--- | Generic 'Map' lens.
-class (AnyLens s (Map k v), Ord k) => HasMap k v s where
-  mapLens :: HasCallStack => Lens' s (Map k v)
-  atLens :: HasCallStack => k -> Lens' s (Maybe v)
-  -- ^ Accees an element of a map
-  atLensM :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
-
--- | Generic instance of 'HasMap'.
-instance (AnyLens s (Map k v), Ord k, Typeable k, Typeable v) => HasMap k v s where
-  mapLens = mapLens' @(Map k v)
-  atLens = atLens' @(Map k v)
-  atLensM k = do
-    k' <- k
-    pure $ Lens $ atLens k'
-
-ixLens :: forall k v s. HasMap k v s => k -> Traversal' s v
-ixLens k = atLens k . _Just
+-- | 'anyLens' for a 'Maybe' value, with default value 'Nothing'.
+maybeLens' :: forall a s. (HasDynamicCache s, Typeable a) => Lens' s (Maybe a)
+maybeLens' = anyLens' @(Maybe a) @s Nothing
 
 -- | 'anyLens' for a value with a 'Default' instance.
 defaultLens :: forall a s. (HasDynamicCache s, Typeable a, Default a) => Lens' s a
@@ -189,11 +135,60 @@ monoidLens ::
   -> Lens' s v
 monoidLens k = atLens' @map k . non (mempty :: v)
 
--- | If you don't want to use the 'DynamicCache' because you already
--- have a place to store location for a type, declare a 'HasLens' instance.
-class HasLens s a where
-  hasLens :: Lens' s a
+-- | An 'At' lens to an element of a map.
+atLens' ::
+  forall map k v s.
+  (AtLens' map s,
+   k ~ Index map,
+   v ~ IxValue map,
+   HasCallStack)
+  => k
+  -> Lens' s (Maybe v)
+atLens' k = mapLens' @map . at k
+
+type AtLens' map s =
+  (HasDynamicCache s,
+   At map,
+   Typeable map,
+   Monoid map,
+   Typeable (Index map),
+   Ord (Index map),
+   Typeable (IxValue map))
 
+-- | Use 'anylens'' to access a Map.
+--
+-- @
+--     > view (mapLens \@Char \@String) $
+--         atLens \'x\' .~ Just "hello" $
+--           atLens \'y\' .~ Just "world" $
+--             (mempty :: DynamicCache)
+--     fromList [(\'x\',"hello"),(\'y\',"world")]
+-- @
+mapLens' ::
+  forall map s.
+  (AtLens' map s,
+   HasCallStack)
+  => Lens' s map
+mapLens' = anyLens' mempty
+
+-- | Generic 'Map' lens.
+class (AnyLens s (Map k v), Ord k) => HasMap k v s where
+  mapLens :: HasCallStack => Lens' s (Map k v)
+  atLens :: HasCallStack => k -> Lens' s (Maybe v)
+  -- ^ Accees an element of a map
+  atLensM :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
+
+-- | Generic instance of 'HasMap'.
+instance (AnyLens s (Map k v), Ord k, Typeable k, Typeable v) => HasMap k v s where
+  mapLens = mapLens' @(Map k v)
+  atLens = atLens' @(Map k v)
+  atLensM k = do
+    k' <- k
+    pure $ Lens $ atLens k'
+
+ixLens :: forall k v s. HasMap k v s => k -> Traversal' s v
+ixLens k = atLens k . _Just
+
 -- | Like HasMap, but with no generic instance and with default method
 -- implementations which can be overridden.
 class Ord k => HasCache k v s where
@@ -211,6 +206,13 @@ class Ord k => HasCache k v s where
 instance Ord k => HasCache k v (Map k v) where
   cacheLens = id
 
+-- | If you don't want to use the 'DynamicCache' declare a 'HasLens'
+-- instance.  This is necessary if you want a persistant value
+-- (DynamicCache has no Serialize instance) or because you already
+-- have a location (not in DynamicCache) where the value is stored.
+class HasLens s a where
+  hasLens :: Lens' s a
+
 -- runTestTT tests
 tests :: Test
 tests =
