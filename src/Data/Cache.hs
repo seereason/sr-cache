@@ -46,11 +46,11 @@ import Test.HUnit
 -- This and other classes in this module are used to break import
 -- cycles by allowing the use of s without actually having its
 -- declaration.
-class (Dyn.HasDynamicCache s, Typeable a) => AnyLens s a where
+class AnyLens s a where
   anyLens :: HasCallStack => a -> Lens' s a
 
 -- | The generic instance of 'AnyLens'.
-instance (Dyn.HasDynamicCache s, Typeable a) => AnyLens s a where
+instance (Typeable a, Dyn.HasDynamicCache s) => AnyLens s a where
   anyLens = Dyn.anyLens
 
 -- | Generic 'Maybe' lens
@@ -58,18 +58,18 @@ class MaybeLens s a where
   maybeLens :: Lens' s (Maybe a)
 
 -- | Generic instance of 'AtLens'.
-instance (AnyLens s (Maybe a), Typeable a) => MaybeLens s a where
+instance (AnyLens s (Maybe a), Typeable a, Dyn.HasDynamicCache s) => MaybeLens s a where
   maybeLens = Dyn.maybeLens
 
 -- | Generic 'Map' lens.
-class (AnyLens s (Map k v), Ord k) => HasMap k v s where
+class HasMap k v s where
   mapLens :: HasCallStack => Lens' s (Map k v)
   atLens :: HasCallStack => k -> Lens' s (Maybe v)
   -- ^ Accees an element of a map
   atLensM :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
 
 -- | Generic instance of 'HasMap'.
-instance (AnyLens s (Map k v), Ord k, Typeable k, Typeable v) => HasMap k v s where
+instance (AnyLens s (Map k v), Ord k, Typeable k, Typeable v, Dyn.HasDynamicCache s) => HasMap k v s where
   mapLens = Dyn.mapLens @(Map k v)
   atLens = Dyn.atLens @(Map k v)
   atLensM k = do
