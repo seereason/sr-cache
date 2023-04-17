@@ -1,6 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
--- {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -46,8 +46,10 @@ class HasEncodedCache s where
 instance HasEncodedCache (EncodedCache (Map Fingerprint ByteString)) where
   encodedCache = id
 
+#if 0
 instance (Serialize a, SafeCopy a, HasEncodedCache (EncodedCache s)) => AnyLens (EncodedCache s) a where
   anyLens = Data.Cache.Encoded.anyLens
+#endif
 
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
