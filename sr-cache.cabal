@@ -14,7 +14,7 @@ Cabal-Version:       >= 1.10
 
 Library
   Build-Depends: base, containers, data-default, lens, HUnit
-  Exposed-Modules: Data.Cache
+  Exposed-Modules: Data.Cache Data.Cache.Dynamic
   Hs-Source-Dirs: src
 
 Test-Suite cache-tests
