@@ -26,8 +26,6 @@ module Data.Cache.Dynamic
   , boundedLens
   , defaultLens
   , monoidLens
-  -- * Non-generic (overridable) lens classes
-  , HasLens(hasLens)
   ) where
 
 import Control.Lens (At(at), Index, IxValue, Iso', iso, _Just, Lens', non,
@@ -146,10 +144,3 @@ mapLens ::
    HasCallStack)
   => Lens' s map
 mapLens = anyLens mempty
-
--- | If you don't want to use the 'DynamicCache' declare a 'HasLens'
--- instance.  This is necessary if you want a persistant value
--- (DynamicCache has no Serialize instance) or because you already
--- have a location (not in DynamicCache) where the value is stored.
-class HasLens s a where
-  hasLens :: Lens' s a
