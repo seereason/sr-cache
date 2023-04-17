@@ -14,7 +14,7 @@ Cabal-Version:       >= 1.10
 
 Library
   Build-Depends: base, bytestring, cereal, containers, data-default, lens, HUnit, safecopy
-  Exposed-Modules: Data.Cache Data.Cache.Dynamic Data.Cache.Encoded
+  Exposed-Modules: Data.Cache Data.Cache.Common Data.Cache.Dynamic Data.Cache.Encoded
   Hs-Source-Dirs: src
 
 Test-Suite cache-tests

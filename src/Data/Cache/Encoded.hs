@@ -1,6 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
 -- {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -13,45 +12,28 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Encoded
   ( -- * Cache type
     EncodedCache
   , HasEncodedCache(encodedCache)
-  , anyLens
-  , maybeLens
-  , atLens
-  , mapLens
-  , boundedLens
-  , defaultLens
-  , monoidLens
+  , tests
   ) where
 
-import Control.Lens (At(at), Index, IxValue, Iso', iso, _Just, Lens', non, Traversal')
+import Control.Lens (At(at), Iso', iso, Lens', set, view)
 import Data.ByteString (ByteString)
-import Data.Default (Default(def))
-import Data.Map.Strict (Map)
+import Data.Cache.Common
+import Data.Map.Strict (fromList, Map)
 import Data.Proxy (Proxy(Proxy))
 import Data.SafeCopy (SafeCopy)
-import Data.Serialize (decode, encode, Serialize(get, put))
-import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
-import GHC.Fingerprint (Fingerprint(..))
+import Data.Serialize (decode, encode, Serialize)
 import GHC.Generics
 import GHC.Stack (HasCallStack)
+import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
+import GHC.Fingerprint (Fingerprint(..))
+import Test.HUnit
 import Type.Reflection ()
-
-instance Serialize Fingerprint where
-  get = do
-    a <- get
-    b <- get
-    pure $ Fingerprint a b
-  put (Fingerprint a b) = put a >> put b
-
-#if !MIN_VERSION_base(4,16,0)
-deriving instance Generic Fingerprint
-#endif
-instance SafeCopy Fingerprint
 
 -- | A map from a type fingerprint ('Fingerprint') to a wrapped value ('ByteString') of that type.
 newtype EncodedCache = EncodedCache (Map Fingerprint ByteString)
@@ -81,6 +63,10 @@ encodedLens d =
     l3 = iso decode' encode
     decode' :: ByteString -> a
     decode' bs = either (error ("decode @" <> show (typeRep (Proxy @a)))) id (decode bs)
+{-# INLINE encodedLens #-}
+
+instance (Serialize a, SafeCopy a, HasEncodedCache s) => AnyLens s a where
+  anyLens = Data.Cache.Encoded.anyLens
 
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
@@ -89,40 +75,17 @@ encodedLens d =
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: DynamicCache)
 -- \'c\'
 -- @
-anyLens :: forall a s. (HasEncodedCache s, Typeable a, Serialize a, SafeCopy a, HasCallStack) => a -> Lens' s a
+anyLens :: forall a s. (HasEncodedCache s, Serialize a, SafeCopy a, HasCallStack) => a -> Lens' s a
 anyLens a = encodedCache @s . encodedLens a
 
--- | 'anyLens' for a 'Maybe' value, with default value 'Nothing'.
-maybeLens :: forall a s. (HasEncodedCache s, Typeable a, Serialize a, SafeCopy a, HasCallStack) => Lens' s (Maybe a)
-maybeLens = anyLens @(Maybe a) @s Nothing
-
--- | 'anyLens' for a value with a 'Default' instance.
-defaultLens :: forall a s. (Default a, HasEncodedCache s, Typeable a, Serialize a, SafeCopy a, HasCallStack) => Lens' s a
-defaultLens = anyLens @a @s def
-
-type AtLens map s =
-  (HasEncodedCache s,
-   At map,
-   Typeable map,
-   Monoid map,
-   Serialize map,
-   SafeCopy map,
-   Typeable (Index map),
-   Ord (Index map),
-   Typeable (IxValue map))
-
+{-
 -- | An 'At' lens to an element of a map.
 atLens ::
-  forall map k v s.
-  (AtLens map s,
-   k ~ Index map,
-   v ~ IxValue map,
-   HasCallStack)
-  => k
-  -> Lens' s (Maybe v)
-atLens k = mapLens @map . at k
+  forall k v s. (HasMap k v s, Ord k, HasCallStack)
+  => k -> Lens' s (Maybe v)
+atLens k = Data.Cache.Common.mapLens @k @v . at k
 
--- | Access the whole map that 'atLens' provides element access to:
+-- | Use 'anylens'' to access a Map.
 --
 -- @
 --     > view (mapLens \@Char \@String) $
@@ -133,30 +96,27 @@ atLens k = mapLens @map . at k
 -- @
 mapLens ::
   forall map s.
-  (AtLens map s,
+  (HasEncodedCache s,
+   Monoid map,
+   Serialize map,
+   SafeCopy map,
    HasCallStack)
   => Lens' s map
-mapLens = anyLens mempty
+mapLens = Data.Cache.Encoded.anyLens mempty
+-}
 
-boundedLens ::
-  forall map k v s.
-  (AtLens map s,
-   k ~ Index map,
-   v ~ IxValue map,
-   Bounded v,
-   Eq v)
-  => k
-  -> Lens' s v
-boundedLens k = atLens @map k . non (minBound :: v)
-
-monoidLens ::
-  forall map k v s.
-  (HasEncodedCache s,
-   AtLens map s,
-   k ~ Index map,
-   v ~ IxValue map,
-   Monoid v,
-   Eq v)
-  => k
-  -> Lens' s v
-monoidLens k = atLens @map k . non (mempty :: v)
+-- runTestTT tests
+tests :: Test
+tests =
+  let m = set (Data.Cache.Common.mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (mempty :: EncodedCache)
+      m2 = set (Data.Cache.Common.mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
+  in TestList
+     [ TestCase (assertEqual "test1" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
+     , TestCase (assertEqual "test2" (Just 5) (view (Data.Cache.Common.atLens @Char @Int 'b') m2))
+     , TestCase (assertEqual "test3" (Just 5) (view (Data.Cache.Common.mapLens @Char @Int . at 'b') m2))
+     , TestCase (assertEqual "test4" Nothing (view (Data.Cache.Common.atLens @Char @Int 'x') m2))
+     , TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
+     , TestCase (assertEqual "b" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
+     , TestCase (assertEqual "c" (Just 5) (view (Data.Cache.Common.atLens @Char @Int 'b') m2))
+     , TestCase (assertEqual "d" (Just 5) (view (Data.Cache.Common.mapLens @Char @Int . at 'b') m2))
+     , TestCase (assertEqual "e" Nothing (view (Data.Cache.Common.atLens @Char @Int 'x') m2)) ]
