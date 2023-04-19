@@ -33,16 +33,16 @@ import GHC.Stack (HasCallStack)
 import Type.Reflection
 
 -- | A map from a type fingerprint ('SomeTypeRep') to a wrapped value ('Dynamic') of that type.
-newtype DynamicCache = Dyn (Map SomeTypeRep Dynamic) deriving (Generic, Monoid, Semigroup)
+newtype DynamicCache s = Dyn s deriving (Generic, Monoid, Semigroup)
 
 -- | How to find the 'DynamicCache' value.
 class HasDynamicCache s where
-  dynamicCache :: Lens' s DynamicCache
-instance HasDynamicCache DynamicCache where
-  dynamicCache = id
+  dynamicCache :: Lens' s (Map SomeTypeRep Dynamic)
+instance HasDynamicCache (DynamicCache (Map SomeTypeRep Dynamic)) where
+  dynamicCache = iso (\(Dyn s) -> s) Dyn
 
 -- | The generic instance of 'AnyLens'.
-instance (Typeable a, HasDynamicCache s) => AnyLens s a where
+instance (Typeable a, HasDynamicCache (DynamicCache s)) => AnyLens (DynamicCache s) a where
   anyLens = Data.Cache.Dynamic.anyLens
 
 -- | Given a default, build a lens that points into any
@@ -56,8 +56,8 @@ anyLens :: forall a s. (HasDynamicCache s, Typeable a, HasCallStack) => a -> Len
 anyLens d =
   dynamicCache @s . l1 . l2 . l3
   where
-    l1 :: Lens' DynamicCache (Maybe Dynamic)
-    l1 = iso (\(Dyn x) -> x) Dyn . at (someTypeRep (Proxy @a))
+    l1 :: Lens' (Map SomeTypeRep Dynamic) (Maybe Dynamic)
+    l1 = at (someTypeRep (Proxy @a))
     l2 :: Iso' (Maybe Dynamic) Dynamic
     l2 = iso (maybe (toDyn d) id) Just
     l3 :: Iso' Dynamic a

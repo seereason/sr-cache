@@ -35,21 +35,18 @@ import Test.HUnit
 import Type.Reflection ()
 
 -- | A map from a type fingerprint ('Fingerprint') to a wrapped value ('ByteString') of that type.
-newtype EncodedCache a = Enc a
-  deriving (Generic, Monoid, Semigroup, Serialize, Eq, Ord)
+newtype EncodedCache a = Enc a deriving (Generic, Monoid, Semigroup, Serialize, Eq, Ord)
 
 instance SafeCopy a => SafeCopy (EncodedCache a)
 
 -- | How to find the 'EncodedCache' value.
 class HasEncodedCache s where
-  encodedCache :: Lens' s (EncodedCache (Map Fingerprint ByteString))
+  encodedCache :: Lens' s (Map Fingerprint ByteString)
 instance HasEncodedCache (EncodedCache (Map Fingerprint ByteString)) where
-  encodedCache = id
+  encodedCache = iso (\(Enc s) -> s) Enc
 
-#if 0
 instance (Serialize a, SafeCopy a, HasEncodedCache (EncodedCache s)) => AnyLens (EncodedCache s) a where
   anyLens = Data.Cache.Encoded.anyLens
-#endif
 
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
@@ -62,8 +59,8 @@ anyLens :: forall a s. (HasEncodedCache s, Serialize a, SafeCopy a, HasCallStack
 anyLens d =
   encodedCache @s . l1 . l2 . l3
   where
-    l1 :: Lens' (EncodedCache (Map Fingerprint ByteString)) (Maybe ByteString)
-    l1 = iso (\(Enc x) -> x) Enc . at (typeRepFingerprint (typeRep (Proxy @a)))
+    l1 :: Lens' (Map Fingerprint ByteString) (Maybe ByteString)
+    l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
     l2 :: Iso' (Maybe ByteString) ByteString
     l2 = iso (maybe (encode d) id) Just
     l3 :: Iso' ByteString a
