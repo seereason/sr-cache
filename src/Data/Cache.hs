@@ -66,60 +66,61 @@ class HasLens s a where
 tests :: Test
 tests = TestList [dynTests, encTests]
 
-data Foo = Foo {dcache :: Map SomeTypeRep Dynamic} deriving Generic
+data Foo = Foo {dcache :: Map SomeTypeRep Dynamic,
+                ecache :: Map Fingerprint ByteString} deriving Generic
 
 instance HasDynamicCache Foo where dynamicCache = #dcache
-instance Typeable a => AnyLens Foo a where anyLens a = dynamicCache . anyLens a
+instance HasDynamicCache (Dyn Foo) where dynamicCache = dyn . dynamicCache
 
-data Bar = Bar {ecache :: Map Fingerprint ByteString} deriving Generic
-
-instance HasEncodedCache Bar where encodedCache = #ecache
-instance (SafeCopy a, Serialize a, Typeable a) => AnyLens Bar a where anyLens a = encodedCache . anyLens a
+instance HasEncodedCache Foo where encodedCache = #ecache
+instance HasEncodedCache (Enc Foo ) where encodedCache = enc . encodedCache
 
 -- runTestTT tests
 dynTests :: Test
 dynTests =
-  TestList $ snd $ evalRWS go () (Foo {dcache = mempty})
+  TestList $ snd $ evalRWS cacheTests () (Dyn (Foo {dcache = mempty, ecache = mempty}))
   where
-    go :: RWS () [Test] Foo ()
-    go = do
-      mapLens .= (fromList [('a',3),('b',5)] :: Map Char Int)
-      mapLens .= (fromList [(4,'a'),(7,'b')] :: Map Int Char)
-      (tellAE "test0" 3.1416) =<< use (anyLens (3.1416 :: Double))
-      (tellAE "test0b" (Nothing :: Maybe Float)) =<< use (maybeLens @_ @Float)
-      maybeLens .= Just (3.1416 :: Float)
-      (tellAE "test0c" (Just 3.1416 :: Maybe Float)) =<< use (maybeLens @_ @Float)
-      (tellAE "test1" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
-      (tellAE "test2" (Just 5)) =<< use (atLens @Char @Int 'b')
-      (tellAE "test3" (Just 5)) =<< use (mapLens @Char @Int . at 'b')
-      (tellAE "test4" Nothing) =<< use (atLens @Char @Int 'x')
-      (tellAE "a" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
-      (tellAE "b" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
-      (tellAE "c" (Just 5)) =<< use (atLens @Char @Int 'b')
-      (tellAE "d" (Just 5)) =<< use (mapLens @Char @Int . at 'b')
-      (tellAE "e" Nothing) =<< use (atLens @Char @Int 'x')
+
+cacheTests :: s ~ Dyn Foo => RWS () [Test] s ()
+cacheTests = do
+  mapLens .= (fromList [('a',3),('b',5)] :: Map Char Int)
+  mapLens .= (fromList [(4,'a'),(7,'b')] :: Map Int Char)
+  (tellAE "test0" 3.1416) =<< use (anyLens (3.1416 :: Double))
+  (tellAE "test0b" (Nothing :: Maybe Float)) =<< use (maybeLens @_ @Float)
+  maybeLens .= Just (3.1416 :: Float)
+  (tellAE "test0c" (Just 3.1416 :: Maybe Float)) =<< use (maybeLens @_ @Float)
+  (tellAE "test1" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
+  (tellAE "test2" (Just 5)) =<< use (atLens @Char @Int 'b')
+  (tellAE "test3" (Just 5)) =<< use (mapLens @Char @Int . at 'b')
+  (tellAE "test4" Nothing) =<< use (atLens @Char @Int 'x')
+  (tellAE "a" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
+  (tellAE "b" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
+  (tellAE "c" (Just 5)) =<< use (atLens @Char @Int 'b')
+  (tellAE "d" (Just 5)) =<< use (mapLens @Char @Int . at 'b')
+  (tellAE "e" Nothing) =<< use (atLens @Char @Int 'x')
+
+cacheTestsE :: s ~ Enc Foo => RWS () [Test] s ()
+cacheTestsE = do
+  mapLens .= (fromList [('a',3),('b',5)] :: Map Char Int)
+  mapLens .= (fromList [(4,'a'),(7,'b')] :: Map Int Char)
+  (tellAE "test0" 3.1416) =<< use (anyLens (3.1416 :: Double))
+  (tellAE "test0b" (Nothing :: Maybe Float)) =<< use (maybeLens @_ @Float)
+  maybeLens .= Just (3.1416 :: Float)
+  (tellAE "test0c" (Just 3.1416 :: Maybe Float)) =<< use (maybeLens @_ @Float)
+  (tellAE "test1" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
+  (tellAE "test2" (Just 5)) =<< use (atLens @Char @Int 'b')
+  (tellAE "test3" (Just 5)) =<< use (mapLens @Char @Int . at 'b')
+  (tellAE "test4" Nothing) =<< use (atLens @Char @Int 'x')
+  (tellAE "a" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
+  (tellAE "b" (fromList [('a',3),('b',5)])) =<< use (mapLens @Char @Int)
+  (tellAE "c" (Just 5)) =<< use (atLens @Char @Int 'b')
+  (tellAE "d" (Just 5)) =<< use (mapLens @Char @Int . at 'b')
+  (tellAE "e" Nothing) =<< use (atLens @Char @Int 'x')
 
 tellAE :: (MonadWriter [Test] m, Eq a, Show a) => String -> a -> a -> m ()
 tellAE name expected value = (tell . (: []) . TestCase . assertEqual name expected) value
-{-
-  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (Dyn (mempty :: Map SomeTypeRep Dynamic))
-      m2 = set (mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
-  in TestList
-     [
--}
 
 -- runTestTT tests
 encTests :: Test
 encTests =
-  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (Enc (mempty :: Map Fingerprint ByteString))
-      m2 = set (mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
-  in TestList
-     [ TestCase (assertEqual "test1" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
-     , TestCase (assertEqual "test2" (Just 5) (view (atLens @Char @Int 'b') m2))
-     , TestCase (assertEqual "test3" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
-     , TestCase (assertEqual "test4" Nothing (view (atLens @Char @Int 'x') m2))
-     , TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
-     , TestCase (assertEqual "b" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
-     , TestCase (assertEqual "c" (Just 5) (view (atLens @Char @Int 'b') m2))
-     , TestCase (assertEqual "d" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
-     , TestCase (assertEqual "e" Nothing (view (atLens @Char @Int 'x') m2)) ]
+  TestList $ snd $ evalRWS cacheTestsE () (Enc (Foo {dcache = mempty, ecache = mempty}))
