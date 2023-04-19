@@ -16,7 +16,7 @@
 
 module Data.Cache.Encoded
   ( -- * Cache type
-    Enc(Enc)
+    Enc(Enc), enc
   , HasEncodedCache(encodedCache)
   ) where
 
@@ -34,6 +34,9 @@ import GHC.Fingerprint (Fingerprint(..))
 
 -- | A map from a type fingerprint ('Fingerprint') to a wrapped value ('ByteString') of that type.
 newtype Enc a = Enc a deriving (Generic, Monoid, Semigroup, Serialize, Eq, Ord)
+
+enc :: Iso' (Enc s) s
+enc = iso (\(Enc s) -> s) Enc
 
 instance SafeCopy a => SafeCopy (Enc a)
 

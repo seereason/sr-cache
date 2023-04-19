@@ -17,7 +17,7 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Dynamic
-  ( Dyn(Dyn)
+  ( Dyn(Dyn), dyn
   , HasDynamicCache(dynamicCache)
   ) where
 
