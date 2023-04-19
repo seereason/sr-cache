@@ -38,7 +38,7 @@ module Data.Cache
   , tests
   ) where
 
-import Control.Lens ((.=), at, iso, Lens', set, use, view)
+import Control.Lens ((.=), at, Lens', set, use, view)
 import Control.Monad.RWS (evalRWS, RWS, tell)
 import Control.Monad.Writer (MonadWriter)
 import Data.ByteString (ByteString)
@@ -46,9 +46,10 @@ import Data.Cache.Common
 import Data.Cache.Dynamic as Dyn (Dyn(Dyn), HasDynamicCache(dynamicCache))
 import Data.Cache.Encoded as Enc (Enc(Enc), HasEncodedCache(encodedCache))
 import Data.Dynamic (Dynamic)
-import Data.Generics.Product
 import Data.Generics.Labels ()
 import Data.Map (fromList, Map)
+import Data.SafeCopy (SafeCopy)
+import Data.Serialize (Serialize)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics
 import Test.HUnit
@@ -65,15 +66,20 @@ class HasLens s a where
 tests :: Test
 tests = TestList [dynTests, encTests]
 
-data Foo = Foo {cache :: Map SomeTypeRep Dynamic} deriving Generic
+data Foo = Foo {dcache :: Map SomeTypeRep Dynamic} deriving Generic
 
-instance HasDynamicCache Foo where dynamicCache = #cache
+instance HasDynamicCache Foo where dynamicCache = #dcache
 instance Typeable a => AnyLens Foo a where anyLens a = dynamicCache . anyLens a
+
+data Bar = Bar {ecache :: Map Fingerprint ByteString} deriving Generic
+
+instance HasEncodedCache Bar where encodedCache = #ecache
+instance (SafeCopy a, Serialize a, Typeable a) => AnyLens Bar a where anyLens a = encodedCache . anyLens a
 
 -- runTestTT tests
 dynTests :: Test
 dynTests =
-  TestList $ snd $ evalRWS go () (Foo {cache = mempty})
+  TestList $ snd $ evalRWS go () (Foo {dcache = mempty})
   where
     go :: RWS () [Test] Foo ()
     go = do

@@ -29,8 +29,8 @@ import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(Proxy))
 import Data.Typeable (Typeable)
 import GHC.Generics
-import GHC.Stack (HasCallStack)
-import Type.Reflection
+-- import GHC.Stack (HasCallStack)
+import Type.Reflection (SomeTypeRep, someTypeRep, typeRep)
 
 -- | A map from a type fingerprint ('SomeTypeRep') to a wrapped value ('Dynamic') of that type.
 newtype Dyn s = Dyn s deriving (Generic, Monoid, Semigroup)

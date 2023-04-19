@@ -20,19 +20,17 @@ module Data.Cache.Encoded
   , HasEncodedCache(encodedCache)
   ) where
 
-import Control.Lens (At(at), Iso', iso, Lens', set, view)
+import Control.Lens (At(at), Iso', iso, Lens')
 import Data.ByteString (ByteString)
 import Data.Cache.Common
-import Data.Map.Strict (fromList, Map)
+import Data.Map.Strict (Map)
 import Data.Proxy (Proxy(Proxy))
 import Data.SafeCopy (SafeCopy)
 import Data.Serialize (decode, encode, Serialize)
 import GHC.Generics
-import GHC.Stack (HasCallStack)
-import Data.Typeable (typeRep, typeRepFingerprint)
+-- import GHC.Stack (HasCallStack)
+import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
-import Test.HUnit
-import Type.Reflection ()
 
 -- | A map from a type fingerprint ('Fingerprint') to a wrapped value ('ByteString') of that type.
 newtype Enc a = Enc a deriving (Generic, Monoid, Semigroup, Serialize, Eq, Ord)
@@ -67,3 +65,6 @@ instance (Serialize a, SafeCopy a, HasEncodedCache (Enc s)) => AnyLens (Enc s) a
       decode' :: ByteString -> a
       decode' bs = either (error ("decode @" <> show (typeRep (Proxy @a)))) id (decode bs)
   {-# INLINE anyLens #-}
+
+instance (SafeCopy a, Serialize a, Typeable a) => AnyLens (Map Fingerprint ByteString) a where
+  anyLens a = iso Enc (\(Enc s) -> s) . anyLens @(Enc (Map Fingerprint ByteString)) a
