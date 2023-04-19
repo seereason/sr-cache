@@ -13,7 +13,7 @@ Build-Type:          Simple
 Cabal-Version:       >= 1.10
 
 Library
-  Build-Depends: base, bytestring, cereal, containers, data-default, lens, HUnit, safecopy
+  Build-Depends: base, bytestring, cereal, containers, data-default, generic-lens, HUnit, lens, mtl, safecopy
   Exposed-Modules: Data.Cache Data.Cache.Common Data.Cache.Dynamic Data.Cache.Encoded
   Hs-Source-Dirs: src
 

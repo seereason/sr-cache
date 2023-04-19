@@ -45,9 +45,6 @@ class HasEncodedCache s where
 instance HasEncodedCache (Enc (Map Fingerprint ByteString)) where
   encodedCache = iso (\(Enc s) -> s) Enc
 
-instance (Serialize a, SafeCopy a, HasEncodedCache (Enc s)) => AnyLens (Enc s) a where
-  anyLens = Data.Cache.Encoded.anyLens
-
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
 --
@@ -55,43 +52,18 @@ instance (Serialize a, SafeCopy a, HasEncodedCache (Enc s)) => AnyLens (Enc s) a
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
-anyLens :: forall a s. (HasEncodedCache s, Serialize a, SafeCopy a, HasCallStack) => a -> Lens' s a
-anyLens d =
-  encodedCache @s . l1 . l2 . l3
-  where
-    l1 :: Lens' (Map Fingerprint ByteString) (Maybe ByteString)
-    l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
-    l2 :: Iso' (Maybe ByteString) ByteString
-    l2 = iso (maybe (encode d) id) Just
-    l3 :: Iso' ByteString a
-    l3 = iso decode' encode
-    decode' :: ByteString -> a
-    decode' bs = either (error ("decode @" <> show (typeRep (Proxy @a)))) id (decode bs)
-{-# INLINE anyLens #-}
-
-{-
--- | An 'At' lens to an element of a map.
-atLens ::
-  forall k v s. (HasMap k v s, Ord k, HasCallStack)
-  => k -> Lens' s (Maybe v)
-atLens k = Data.Cache.Common.mapLens @k @v . at k
-
--- | Use 'anylens'' to access a Map.
---
--- @
---     > view (mapLens \@Char \@String) $
---         atLens \'x\' .~ Just "hello" $
---           atLens \'y\' .~ Just "world" $
---             (mempty :: Dyn)
---     fromList [(\'x\',"hello"),(\'y\',"world")]
--- @
-mapLens ::
-  forall map s.
-  (HasEncodedCache s,
-   Monoid map,
-   Serialize map,
-   SafeCopy map,
-   HasCallStack)
-  => Lens' s map
-mapLens = Data.Cache.Encoded.anyLens mempty
--}
+instance (Serialize a, SafeCopy a, HasEncodedCache (Enc s)) => AnyLens (Enc s) a where
+  anyLens d =
+    l0 . l1 . l2 . l3
+    where
+      l0 :: Lens' (Enc s) (Map Fingerprint ByteString)
+      l0 = encodedCache @(Enc s)
+      l1 :: Lens' (Map Fingerprint ByteString) (Maybe ByteString)
+      l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
+      l2 :: Iso' (Maybe ByteString) ByteString
+      l2 = iso (maybe (encode d) id) Just
+      l3 :: Iso' ByteString a
+      l3 = iso decode' encode
+      decode' :: ByteString -> a
+      decode' bs = either (error ("decode @" <> show (typeRep (Proxy @a)))) id (decode bs)
+  {-# INLINE anyLens #-}
