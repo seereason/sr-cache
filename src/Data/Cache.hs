@@ -19,10 +19,10 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache
-  ( Dyn(Dyn)
-  , HasDynamicCache(dynamicCache)
-  , Enc(Enc)
+  ( HasDynamicCache(dynamicCache)
   , HasEncodedCache(encodedCache)
+  -- , Dyn(Dyn), Enc(Enc)
+  -- * For Dynamic
   , anyLens
   , maybeLens
   , mapLens
@@ -32,6 +32,14 @@ module Data.Cache
   , defaultLens
   , boundedLens
   , monoidLens
+  -- * Encoded duplicates
+  , anyLensE
+  , maybeLensE
+  , atLensE
+  , defaultLensE
+  , boundedLensE
+  , monoidLensE
+  , ixLensE
   -- * Non-generic (overridable) lens classes
   , HasLens(hasLens)
   -- * Tests
@@ -43,8 +51,8 @@ import Control.Monad.RWS (evalRWS, RWS, tell)
 import Control.Monad.Writer (MonadWriter)
 import Data.ByteString (ByteString)
 import Data.Cache.Common
-import Data.Cache.Dynamic as Dyn (Dyn(Dyn), dyn, HasDynamicCache(dynamicCache))
-import Data.Cache.Encoded as Enc (Enc(Enc), enc, HasEncodedCache(encodedCache))
+import Data.Cache.Dynamic as Dyn
+import Data.Cache.Encoded as Enc
 import Data.Dynamic (Dynamic)
 import Data.Generics.Labels ()
 import Data.Map (fromList, Map)
@@ -70,18 +78,18 @@ data Foo = Foo {dcache :: Map SomeTypeRep Dynamic,
                 ecache :: Map Fingerprint ByteString} deriving Generic
 
 instance HasDynamicCache Foo where dynamicCache = #dcache
-instance HasDynamicCache (Dyn Foo) where dynamicCache = dyn . dynamicCache
+-- instance HasDynamicCache (Dyn Foo) where dynamicCache = dyn . dynamicCache
 
 instance HasEncodedCache Foo where encodedCache = #ecache
-instance HasEncodedCache (Enc Foo ) where encodedCache = enc . encodedCache
+-- instance HasEncodedCache (Enc Foo ) where encodedCache = enc . encodedCache
 
 -- runTestTT tests
 dynTests :: Test
 dynTests =
-  TestList $ snd $ evalRWS cacheTests () (Dyn (Foo {dcache = mempty, ecache = mempty}))
+  TestList $ snd $ evalRWS cacheTests () (Foo {dcache = mempty, ecache = mempty})
   where
 
-cacheTests :: s ~ Dyn Foo => RWS () [Test] s ()
+cacheTests :: s ~ Foo => RWS () [Test] s ()
 cacheTests = do
   mapLens .= (fromList [('a',3),('b',5)] :: Map Char Int)
   mapLens .= (fromList [(4,'a'),(7,'b')] :: Map Int Char)
@@ -99,7 +107,7 @@ cacheTests = do
   (tellAE "d" (Just 5)) =<< use (mapLens @Char @Int . at 'b')
   (tellAE "e" Nothing) =<< use (atLens @Char @Int 'x')
 
-cacheTestsE :: s ~ Enc Foo => RWS () [Test] s ()
+cacheTestsE :: s ~ Foo => RWS () [Test] s ()
 cacheTestsE = do
   mapLens .= (fromList [('a',3),('b',5)] :: Map Char Int)
   mapLens .= (fromList [(4,'a'),(7,'b')] :: Map Int Char)
@@ -123,4 +131,4 @@ tellAE name expected value = (tell . (: []) . TestCase . assertEqual name expect
 -- runTestTT tests
 encTests :: Test
 encTests =
-  TestList $ snd $ evalRWS cacheTestsE () (Enc (Foo {dcache = mempty, ecache = mempty}))
+  TestList $ snd $ evalRWS cacheTestsE () (Foo {dcache = mempty, ecache = mempty})

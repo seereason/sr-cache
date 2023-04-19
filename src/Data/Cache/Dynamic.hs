@@ -17,8 +17,8 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Dynamic
-  ( Dyn(Dyn), dyn
-  , HasDynamicCache(dynamicCache)
+  ( HasDynamicCache(dynamicCache)
+  -- , Dyn(Dyn), dyn
   ) where
 
 import Control.Lens (At(at), Iso', iso, Lens')
@@ -28,21 +28,21 @@ import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(Proxy))
 import Data.Typeable (Typeable)
-import GHC.Generics
+-- import GHC.Generics
 -- import GHC.Stack (HasCallStack)
 import Type.Reflection (SomeTypeRep, someTypeRep, typeRep)
 
+{-
 -- | A map from a type fingerprint ('SomeTypeRep') to a wrapped value ('Dynamic') of that type.
 newtype Dyn s = Dyn s deriving (Generic, Monoid, Semigroup)
 
 dyn :: Iso' (Dyn s) s
 dyn = iso (\(Dyn s) -> s) Dyn
+-}
 
 -- | How to find the dynamic cache map.
 class HasDynamicCache s where
   dynamicCache :: Lens' s (Map SomeTypeRep Dynamic)
-instance HasDynamicCache (Dyn (Map SomeTypeRep Dynamic)) where
-  dynamicCache = dyn
 
 -- | Given a default, build a lens that points into any
 -- 'HasDynamicCache' instance to a value of any 'Typeable' @a@.
@@ -51,12 +51,12 @@ instance HasDynamicCache (Dyn (Map SomeTypeRep Dynamic)) where
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
-instance (Typeable a, HasDynamicCache (Dyn s)) => AnyLens (Dyn s) a where
+instance (Typeable a, HasDynamicCache s) => AnyLens s a where
   anyLens d =
     l0 . l1 . l2 . l3
     where
-      l0 :: Lens' (Dyn s) (Map SomeTypeRep Dynamic)
-      l0 = dynamicCache @(Dyn s)
+      l0 :: Lens' s (Map SomeTypeRep Dynamic)
+      l0 = dynamicCache @s
       l1 :: Lens' (Map SomeTypeRep Dynamic) (Maybe Dynamic)
       l1 = at (someTypeRep (Proxy @a))
       l2 :: Iso' (Maybe Dynamic) Dynamic
@@ -64,6 +64,3 @@ instance (Typeable a, HasDynamicCache (Dyn s)) => AnyLens (Dyn s) a where
       l3 :: Iso' Dynamic a
       l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep @a))) . fromDynamic) toDyn
   {-# INLINE anyLens #-}
-
-instance Typeable a => AnyLens (Map SomeTypeRep Dynamic) a where
-  anyLens a = iso Dyn (\(Dyn s) -> s) . anyLens @(Dyn (Map SomeTypeRep Dynamic)) a
