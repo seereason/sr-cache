@@ -40,8 +40,8 @@ module Data.Cache
 import Control.Lens (at, Lens', set, view)
 import Data.ByteString (ByteString)
 import Data.Cache.Common
-import Data.Cache.Dynamic
-import Data.Cache.Encoded as Enc
+import Data.Cache.Dynamic as Dyn (DynamicCache(Dyn), HasDynamicCache(dynamicCache))
+import Data.Cache.Encoded as Enc (EncodedCache(Enc), HasEncodedCache(encodedCache))
 import Data.Dynamic (Dynamic)
 import Data.Map (fromList, Map)
 import GHC.Fingerprint (Fingerprint(..))
@@ -62,31 +62,32 @@ tests = TestList [dynTests, encTests]
 -- runTestTT tests
 dynTests :: Test
 dynTests =
-  let m = set (Data.Cache.Common.mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (Dyn (mempty :: Map SomeTypeRep Dynamic))
-      m2 = set (Data.Cache.Common.mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
+  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (Dyn (mempty :: Map SomeTypeRep Dynamic))
+      m2 = set (mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
   in TestList
-     [ TestCase (assertEqual "test1" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
-     , TestCase (assertEqual "test2" (Just 5) (view (Data.Cache.Common.atLens @Char @Int 'b') m2))
-     , TestCase (assertEqual "test3" (Just 5) (view (Data.Cache.Common.mapLens @Char @Int . at 'b') m2))
-     , TestCase (assertEqual "test4" Nothing (view (Data.Cache.Common.atLens @Char @Int 'x') m2))
-     , TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
-     , TestCase (assertEqual "b" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
-     , TestCase (assertEqual "c" (Just 5) (view (Data.Cache.Common.atLens @Char @Int 'b') m2))
-     , TestCase (assertEqual "d" (Just 5) (view (Data.Cache.Common.mapLens @Char @Int . at 'b') m2))
-     , TestCase (assertEqual "e" Nothing (view (Data.Cache.Common.atLens @Char @Int 'x') m2)) ]
+     [ TestCase (assertEqual "test0" 3.1416 (view (anyLens (3.1416 :: Double)) m))
+     , TestCase (assertEqual "test1" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
+     , TestCase (assertEqual "test2" (Just 5) (view (atLens @Char @Int 'b') m2))
+     , TestCase (assertEqual "test3" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
+     , TestCase (assertEqual "test4" Nothing (view (atLens @Char @Int 'x') m2))
+     , TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
+     , TestCase (assertEqual "b" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
+     , TestCase (assertEqual "c" (Just 5) (view (atLens @Char @Int 'b') m2))
+     , TestCase (assertEqual "d" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
+     , TestCase (assertEqual "e" Nothing (view (atLens @Char @Int 'x') m2)) ]
 
 -- runTestTT tests
 encTests :: Test
 encTests =
-  let m = set (Data.Cache.Common.mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (Enc (mempty :: Map Fingerprint ByteString))
-      m2 = set (Data.Cache.Common.mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
+  let m = set (mapLens @Char @Int) (fromList [('a',3),('b',5)] :: Map Char Int) (Enc (mempty :: Map Fingerprint ByteString))
+      m2 = set (mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
   in TestList
-     [ TestCase (assertEqual "test1" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
-     , TestCase (assertEqual "test2" (Just 5) (view (Data.Cache.Common.atLens @Char @Int 'b') m2))
-     , TestCase (assertEqual "test3" (Just 5) (view (Data.Cache.Common.mapLens @Char @Int . at 'b') m2))
-     , TestCase (assertEqual "test4" Nothing (view (Data.Cache.Common.atLens @Char @Int 'x') m2))
-     , TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
-     , TestCase (assertEqual "b" (fromList [('a',3),('b',5)]) (view (Data.Cache.Common.mapLens @Char @Int) m2))
-     , TestCase (assertEqual "c" (Just 5) (view (Data.Cache.Common.atLens @Char @Int 'b') m2))
-     , TestCase (assertEqual "d" (Just 5) (view (Data.Cache.Common.mapLens @Char @Int . at 'b') m2))
-     , TestCase (assertEqual "e" Nothing (view (Data.Cache.Common.atLens @Char @Int 'x') m2)) ]
+     [ TestCase (assertEqual "test1" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
+     , TestCase (assertEqual "test2" (Just 5) (view (atLens @Char @Int 'b') m2))
+     , TestCase (assertEqual "test3" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
+     , TestCase (assertEqual "test4" Nothing (view (atLens @Char @Int 'x') m2))
+     , TestCase (assertEqual "a" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
+     , TestCase (assertEqual "b" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
+     , TestCase (assertEqual "c" (Just 5) (view (atLens @Char @Int 'b') m2))
+     , TestCase (assertEqual "d" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
+     , TestCase (assertEqual "e" Nothing (view (atLens @Char @Int 'x') m2)) ]
