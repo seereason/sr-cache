@@ -19,8 +19,8 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache
-  ( HasDynamicCache(dynamicCache)
-  , HasEncodedCache(encodedCache)
+  ( HasDynamicCache(dynamicCache), DynamicCache
+  , HasEncodedCache(encodedCache), EncodedCache
   -- , Dyn(Dyn), Enc(Enc)
   -- * For Dynamic
   , anyLens

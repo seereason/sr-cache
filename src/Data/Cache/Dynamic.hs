@@ -17,7 +17,8 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Dynamic
-  ( HasDynamicCache(dynamicCache)
+  ( DynamicCache
+  , HasDynamicCache(dynamicCache)
   -- , Dyn(Dyn), dyn
   ) where
 
@@ -40,9 +41,11 @@ dyn :: Iso' (Dyn s) s
 dyn = iso (\(Dyn s) -> s) Dyn
 -}
 
+type DynamicCache = Map SomeTypeRep Dynamic
+
 -- | How to find the dynamic cache map.
 class HasDynamicCache s where
-  dynamicCache :: Lens' s (Map SomeTypeRep Dynamic)
+  dynamicCache :: Lens' s DynamicCache
 
 -- | Given a default, build a lens that points into any
 -- 'HasDynamicCache' instance to a value of any 'Typeable' @a@.
@@ -55,9 +58,9 @@ instance (Typeable a, HasDynamicCache s) => AnyLens s a where
   anyLens d =
     l0 . l1 . l2 . l3
     where
-      l0 :: Lens' s (Map SomeTypeRep Dynamic)
+      l0 :: Lens' s DynamicCache
       l0 = dynamicCache @s
-      l1 :: Lens' (Map SomeTypeRep Dynamic) (Maybe Dynamic)
+      l1 :: Lens' DynamicCache (Maybe Dynamic)
       l1 = at (someTypeRep (Proxy @a))
       l2 :: Iso' (Maybe Dynamic) Dynamic
       l2 = iso (maybe (toDyn d) id) Just

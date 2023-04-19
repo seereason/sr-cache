@@ -15,8 +15,8 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Encoded
-  ( -- * Cache type
-    HasEncodedCache(encodedCache)
+  ( EncodedCache
+  , HasEncodedCache(encodedCache)
   -- , Enc(Enc), enc
     -- * Duplicates for encoded
   , anyLensE
@@ -49,9 +49,11 @@ enc :: Iso' (Enc s) s
 enc = iso (\(Enc s) -> s) Enc
 -}
 
+type EncodedCache = Map Fingerprint ByteString
+
 -- | How to find the encode cache map.
 class HasEncodedCache s where
-  encodedCache :: Lens' s (Map Fingerprint ByteString)
+  encodedCache :: Lens' s EncodedCache
 
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
@@ -64,9 +66,9 @@ instance (Serialize a, SafeCopy a, HasEncodedCache s) => AnyLensE s a where
   anyLensE d =
     l0 . l1 . l2 . l3
     where
-      l0 :: Lens' s (Map Fingerprint ByteString)
+      l0 :: Lens' s EncodedCache
       l0 = encodedCache @s
-      l1 :: Lens' (Map Fingerprint ByteString) (Maybe ByteString)
+      l1 :: Lens' EncodedCache (Maybe ByteString)
       l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
       l2 :: Iso' (Maybe ByteString) ByteString
       l2 = iso (maybe (encode d) id) Just
