@@ -16,7 +16,7 @@
 
 module Data.Cache.Encoded
   ( -- * Cache type
-    EncodedCache(Enc)
+    Enc(Enc)
   , HasEncodedCache(encodedCache)
   ) where
 
@@ -35,24 +35,24 @@ import Test.HUnit
 import Type.Reflection ()
 
 -- | A map from a type fingerprint ('Fingerprint') to a wrapped value ('ByteString') of that type.
-newtype EncodedCache a = Enc a deriving (Generic, Monoid, Semigroup, Serialize, Eq, Ord)
+newtype Enc a = Enc a deriving (Generic, Monoid, Semigroup, Serialize, Eq, Ord)
 
-instance SafeCopy a => SafeCopy (EncodedCache a)
+instance SafeCopy a => SafeCopy (Enc a)
 
--- | How to find the 'EncodedCache' value.
+-- | How to find the encode cache map.
 class HasEncodedCache s where
   encodedCache :: Lens' s (Map Fingerprint ByteString)
-instance HasEncodedCache (EncodedCache (Map Fingerprint ByteString)) where
+instance HasEncodedCache (Enc (Map Fingerprint ByteString)) where
   encodedCache = iso (\(Enc s) -> s) Enc
 
-instance (Serialize a, SafeCopy a, HasEncodedCache (EncodedCache s)) => AnyLens (EncodedCache s) a where
+instance (Serialize a, SafeCopy a, HasEncodedCache (Enc s)) => AnyLens (Enc s) a where
   anyLens = Data.Cache.Encoded.anyLens
 
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
 --
 -- @
--- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: DynamicCache)
+-- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
 anyLens :: forall a s. (HasEncodedCache s, Serialize a, SafeCopy a, HasCallStack) => a -> Lens' s a
@@ -82,7 +82,7 @@ atLens k = Data.Cache.Common.mapLens @k @v . at k
 --     > view (mapLens \@Char \@String) $
 --         atLens \'x\' .~ Just "hello" $
 --           atLens \'y\' .~ Just "world" $
---             (mempty :: DynamicCache)
+--             (mempty :: Dyn)
 --     fromList [(\'x\',"hello"),(\'y\',"world")]
 -- @
 mapLens ::

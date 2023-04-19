@@ -17,7 +17,7 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Dynamic
-  ( DynamicCache(Dyn)
+  ( Dyn(Dyn)
   , HasDynamicCache(dynamicCache)
   ) where
 
@@ -33,23 +33,23 @@ import GHC.Stack (HasCallStack)
 import Type.Reflection
 
 -- | A map from a type fingerprint ('SomeTypeRep') to a wrapped value ('Dynamic') of that type.
-newtype DynamicCache s = Dyn s deriving (Generic, Monoid, Semigroup)
+newtype Dyn s = Dyn s deriving (Generic, Monoid, Semigroup)
 
--- | How to find the 'DynamicCache' value.
+-- | How to find the dynamic cache map.
 class HasDynamicCache s where
   dynamicCache :: Lens' s (Map SomeTypeRep Dynamic)
-instance HasDynamicCache (DynamicCache (Map SomeTypeRep Dynamic)) where
+instance HasDynamicCache (Dyn (Map SomeTypeRep Dynamic)) where
   dynamicCache = iso (\(Dyn s) -> s) Dyn
 
 -- | The generic instance of 'AnyLens'.
-instance (Typeable a, HasDynamicCache (DynamicCache s)) => AnyLens (DynamicCache s) a where
+instance (Typeable a, HasDynamicCache (Dyn s)) => AnyLens (Dyn s) a where
   anyLens = Data.Cache.Dynamic.anyLens
 
 -- | Given a default, build a lens that points into any
 -- 'HasDynamicCache' instance to a value of any 'Typeable' @a@.
 --
 -- @
--- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: DynamicCache)
+-- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
 anyLens :: forall a s. (HasDynamicCache s, Typeable a, HasCallStack) => a -> Lens' s a

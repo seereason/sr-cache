@@ -18,9 +18,9 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache
-  ( DynamicCache(Dyn)
+  ( Dyn(Dyn)
   , HasDynamicCache(dynamicCache)
-  , EncodedCache(Enc)
+  , Enc(Enc)
   , HasEncodedCache(encodedCache)
   , anyLens
   , maybeLens
@@ -40,18 +40,18 @@ module Data.Cache
 import Control.Lens (at, Lens', set, view)
 import Data.ByteString (ByteString)
 import Data.Cache.Common
-import Data.Cache.Dynamic as Dyn (DynamicCache(Dyn), HasDynamicCache(dynamicCache))
-import Data.Cache.Encoded as Enc (EncodedCache(Enc), HasEncodedCache(encodedCache))
+import Data.Cache.Dynamic as Dyn (Dyn(Dyn), HasDynamicCache(dynamicCache))
+import Data.Cache.Encoded as Enc (Enc(Enc), HasEncodedCache(encodedCache))
 import Data.Dynamic (Dynamic)
 import Data.Map (fromList, Map)
 import GHC.Fingerprint (Fingerprint(..))
 import Test.HUnit
 import Type.Reflection (SomeTypeRep)
 
--- | If you don't want to use the 'DynamicCache' declare a 'HasLens'
+-- | If you don't want to use the 'Dyn' declare a 'HasLens'
 -- instance.  This is necessary if you want a persistant value
--- (DynamicCache has no Serialize instance) or because you already
--- have a location (not in DynamicCache) where the value is stored.
+-- (Dyn has no Serialize instance) or because you already
+-- have a location (not in Dyn) where the value is stored.
 class HasLens s a where
   hasLens :: Lens' s a
 
@@ -66,6 +66,7 @@ dynTests =
       m2 = set (mapLens @Int @Char) (fromList [(4,'a'),(7,'b')] :: Map Int Char) m
   in TestList
      [ TestCase (assertEqual "test0" 3.1416 (view (anyLens (3.1416 :: Double)) m))
+     , TestCase (assertEqual "test0b" (Nothing :: Maybe Float) (view (maybeLens @(Dyn (Map SomeTypeRep Dynamic)) @Float) m))
      , TestCase (assertEqual "test1" (fromList [('a',3),('b',5)]) (view (mapLens @Char @Int) m2))
      , TestCase (assertEqual "test2" (Just 5) (view (atLens @Char @Int 'b') m2))
      , TestCase (assertEqual "test3" (Just 5) (view (mapLens @Char @Int . at 'b') m2))
