@@ -65,5 +65,5 @@ instance (Typeable a, HasDynamicCache s) => AnyLens s a where
       l2 :: Iso' (Maybe Dynamic) Dynamic
       l2 = iso (maybe (toDyn d) id) Just
       l3 :: Iso' Dynamic a
-      l3 = iso (fromMaybe (error ("fromDyn @" <> show (typeRep @a))) . fromDynamic) toDyn
+      l3 = iso (fromMaybe {-(error ("fromDyn @" <> show (typeRep @a)))-} d . fromDynamic) toDyn
   {-# INLINE anyLens #-}

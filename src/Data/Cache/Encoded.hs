@@ -75,7 +75,7 @@ instance (Serialize a, SafeCopy a, HasEncodedCache s) => AnyLensE s a where
       l3 :: Iso' ByteString a
       l3 = iso decode' encode
       decode' :: ByteString -> a
-      decode' bs = either (error ("decode @" <> show (typeRep (Proxy @a)))) id (decode bs)
+      decode' bs = either ({-error ("decode @" <> show (typeRep (Proxy @a)))-} d) id (decode bs)
   {-# INLINE anyLensE #-}
 
 -- Duplicates of the Dynamic classes.
