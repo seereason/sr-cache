@@ -46,7 +46,7 @@ module Data.Cache
   , tests
   ) where
 
-import Control.Lens ((.=), at, Lens', set, use, view)
+import Control.Lens ((.=), at, Lens', use)
 import Control.Monad.RWS (evalRWS, RWS, tell)
 import Control.Monad.Writer (MonadWriter)
 import Data.ByteString (ByteString)
@@ -56,12 +56,12 @@ import Data.Cache.Encoded as Enc
 import Data.Dynamic (Dynamic)
 import Data.Generics.Labels ()
 import Data.Map (fromList, Map)
-import Data.SafeCopy (SafeCopy)
-import Data.Serialize (Serialize)
+--import Data.SafeCopy (SafeCopy)
+--import Data.Serialize (Serialize)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics
 import Test.HUnit
-import Type.Reflection (SomeTypeRep, Typeable)
+import Type.Reflection (SomeTypeRep)
 
 -- | If you don't want to use the 'Dyn' declare a 'HasLens'
 -- instance.  This is necessary if you want a persistant value
