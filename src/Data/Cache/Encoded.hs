@@ -21,6 +21,7 @@ module Data.Cache.Encoded
     -- * Duplicates for encoded
   , anyLensE
   , maybeLensE
+  , mapLensE
   , atLensE
   , atLensME
   , defaultLensE
