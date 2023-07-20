@@ -1,3 +1,8 @@
+-- | Similar to dynamic cache but serializable.  This is achieved by
+-- encoding the value into a ByteString rather than a Dynamic.  This
+-- means higher encoding/decoding overhead, but it also means we can
+-- move data between client and server.
+
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
@@ -32,13 +37,11 @@ module Data.Cache.Encoded
 
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
 import Data.ByteString (ByteString)
---import Data.Cache.Common
+import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Default (Default(def))
 import Data.Map.Strict (Map)
 import Data.Proxy (Proxy(Proxy))
 import Data.SafeCopy (SafeCopy)
-import Data.Serialize (decode, encode, Serialize)
---import GHC.Generics
 import GHC.Stack (HasCallStack)
 import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
@@ -64,7 +67,7 @@ class HasEncodedCache s where
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
-instance (Serialize a, SafeCopy a, HasEncodedCache s) => AnyLensE s a where
+instance (SafeCopy a, HasEncodedCache s) => AnyLensE s a where
   anyLensE d =
     l0 . l1 . l2 . l3
     where
@@ -73,11 +76,11 @@ instance (Serialize a, SafeCopy a, HasEncodedCache s) => AnyLensE s a where
       l1 :: Lens' EncodedCache (Maybe ByteString)
       l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
       l2 :: Iso' (Maybe ByteString) ByteString
-      l2 = iso (maybe (encode d) id) Just
+      l2 = iso (maybe (safeEncode d) id) Just
       l3 :: Iso' ByteString a
-      l3 = iso decode' encode
+      l3 = iso decode' safeEncode
       decode' :: ByteString -> a
-      decode' bs = either (\_ -> d {-error ("decode @" <> show (typeRep (Proxy @a)))-}) id (decode bs)
+      decode' bs = either (\_ -> d {-error ("decode @" <> show (typeRep (Proxy @a)))-}) id (safeDecode bs)
   {-# INLINE anyLensE #-}
 
 -- Duplicates of the Dynamic classes.

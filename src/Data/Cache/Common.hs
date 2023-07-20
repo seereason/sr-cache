@@ -12,7 +12,9 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Common
-  ( AnyLens(anyLens)
+  ( safeEncode
+  , safeDecode
+  , AnyLens(anyLens)
   , MaybeLens(maybeLens)
   , HasMap(mapLens, atLens, atLensM)
   , defaultLens
@@ -22,21 +24,29 @@ module Data.Cache.Common
   ) where
 
 import Control.Lens (at, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
+import Data.ByteString (ByteString)
 import Data.Default (Default(def))
 import Data.Map.Strict (Map)
-import Data.SafeCopy (SafeCopy)
-import Data.Serialize (Serialize(get, put))
+import Data.SafeCopy (SafeCopy, safeGet, safePut)
+import Data.Serialize (runPut, runGet, Serialize(get, put))
 import Data.Typeable (Typeable)
 import GHC.Generics
 import GHC.Stack (HasCallStack)
 import GHC.Fingerprint (Fingerprint(..))
 
+safeEncode :: SafeCopy a => a -> ByteString
+safeEncode = runPut . safePut
+safeDecode :: SafeCopy a => ByteString -> Either String a
+safeDecode = runGet safeGet
+
+{-
 instance Serialize Fingerprint where
   get = do
     a <- get
     b <- get
     pure $ Fingerprint a b
   put (Fingerprint a b) = put a >> put b
+-}
 
 #if !MIN_VERSION_base(4,16,0)
 deriving instance Generic Fingerprint
