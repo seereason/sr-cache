@@ -6,6 +6,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -21,7 +22,7 @@
 
 module Data.Cache.Encoded
   ( EncodedCache
-  , HasEncodedCache(encodedCache)
+  , HasEncodedCache(encodedCache, encodedCachePath)
   -- , Enc(Enc), enc
     -- * Duplicates for encoded
   , anyLensE
@@ -36,6 +37,7 @@ module Data.Cache.Encoded
   ) where
 
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
+import Control.Lens.Path (PathTo, OpticTag(L))
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Default (Default(def))
@@ -59,6 +61,7 @@ type EncodedCache = Map Fingerprint ByteString
 -- | How to find the encode cache map.
 class HasEncodedCache s where
   encodedCache :: Lens' s EncodedCache
+  encodedCachePath :: PathTo 'L s EncodedCache
 
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
 -- It has a default value argument.
