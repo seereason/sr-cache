@@ -24,6 +24,7 @@
 module Data.Cache
   ( HasDynamicCache(dynamicCache), DynamicCache
   , HasEncodedCache(encodedCache), EncodedCache
+  , HasEncodedCachePath(encodedCachePath)
   -- , Dyn(Dyn), Enc(Enc)
   -- * For Dynamic
   , anyLens
@@ -84,6 +85,7 @@ instance Value ByteString where hops _ = []
 instance HasDynamicCache DynamicCache where dynamicCache = id
 instance HasEncodedCache EncodedCache where
   encodedCache = id
+instance HasEncodedCachePath EncodedCache where
   encodedCachePath = upcastOptic idPath
 
 deriving instance Serialize Fingerprint

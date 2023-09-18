@@ -22,7 +22,8 @@
 
 module Data.Cache.Encoded
   ( EncodedCache
-  , HasEncodedCache(encodedCache, encodedCachePath)
+  , HasEncodedCache(encodedCache)
+  , HasEncodedCachePath(encodedCachePath)
   -- , Enc(Enc), enc
     -- * Duplicates for encoded
   , anyLensE
@@ -61,6 +62,7 @@ type EncodedCache = Map Fingerprint ByteString
 -- | How to find the encode cache map.
 class HasEncodedCache s where
   encodedCache :: Lens' s EncodedCache
+class HasEncodedCachePath s where
   encodedCachePath :: PathTo 'L s EncodedCache
 
 -- | Generic lens, allows access to a single @a@ inside a value @s@.
