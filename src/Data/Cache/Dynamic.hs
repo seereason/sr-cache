@@ -46,6 +46,8 @@ type DynamicCache = Map SomeTypeRep Dynamic
 -- | How to find the dynamic cache map.
 class HasDynamicCache s where
   dynamicCache :: Lens' s DynamicCache
+instance HasDynamicCache DynamicCache where
+  dynamicCache = id
 
 -- | Given a default, build a lens that points into any
 -- 'HasDynamicCache' instance to a value of any 'Typeable' @a@.

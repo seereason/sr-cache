@@ -34,6 +34,7 @@ import GHC.Generics
 import GHC.Stack (HasCallStack)
 import GHC.Fingerprint (Fingerprint(..))
 
+-- | Serialize a value using a type's SafeCopy instance.
 safeEncode :: SafeCopy a => a -> ByteString
 safeEncode = runPut . safePut
 safeDecode :: SafeCopy a => ByteString -> Either String a

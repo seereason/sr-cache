@@ -6,7 +6,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -51,10 +50,8 @@ module Data.Cache
   ) where
 
 import Control.Lens ((.=), at, Lens', use)
-import Control.Lens.Path (fieldPath, Value(hops), WithFieldOptic(withFieldOptic), Field(Field'), HopType(RecType), idPath, upcastOptic, upcastPath, OpticTag(L), PathTo)
 import Control.Monad.RWS (evalRWS, RWS, tell)
 import Control.Monad.Writer (MonadWriter)
-import Data.ByteString (ByteString)
 import Data.Cache.Common
 import Data.Cache.Dynamic as Dyn
 import Data.Cache.Encoded as Enc
@@ -63,7 +60,6 @@ import Data.Generics.Labels ()
 import Data.Generics.Product (field)
 import Data.Map (fromList, Map)
 --import Data.SafeCopy (SafeCopy)
-import Data.Serialize (Serialize)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics
 import Test.HUnit
@@ -79,16 +75,6 @@ class HasLens s a where
 -- runTestTT tests
 tests :: Test
 tests = TestList [dynTests, encTests]
-
-instance Value ByteString where hops _ = []
-
-instance HasDynamicCache DynamicCache where dynamicCache = id
-instance HasEncodedCache EncodedCache where
-  encodedCache = id
-instance HasEncodedCachePath EncodedCache where
-  encodedCachePath = upcastOptic idPath
-
-deriving instance Serialize Fingerprint
 
 -- runTestTT dynTests
 dynTests :: Test
@@ -118,9 +104,9 @@ cacheTestsE = do
   mapLensE .= (fromList [('a',3),('b',5)] :: Map Char Int)
   mapLensE .= (fromList [(4,'a'),(7,'b')] :: Map Int Char)
   (tellAE "test0" 3.1416) =<< use (anyLensE (3.1416 :: Double))
-  (tellAE "test0b" (Nothing :: Maybe Float)) =<< use (maybeLensE @_ @Float)
+  (tellAE "test0b" (Nothing :: Maybe Float)) =<< use (maybeLensE @Float)
   maybeLensE .= Just (3.1416 :: Float)
-  (tellAE "test0c" (Just 3.1416 :: Maybe Float)) =<< use (maybeLensE @_ @Float)
+  (tellAE "test0c" (Just 3.1416 :: Maybe Float)) =<< use (maybeLensE @Float)
   (tellAE "test1" (fromList [('a',3),('b',5)])) =<< use (mapLensE @Char @Int)
   (tellAE "test2" (Just 5)) =<< use (atLensE @Char @Int 'b')
   (tellAE "test3" (Just 5)) =<< use (mapLensE @Char @Int . at 'b')
