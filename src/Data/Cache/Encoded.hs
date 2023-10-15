@@ -1,7 +1,15 @@
 -- | Similar to dynamic cache but serializable.  This is achieved by
 -- encoding the value into a ByteString rather than a Dynamic.  This
 -- means higher encoding/decoding overhead, but it also means we can
--- move data between client and server.
+-- move data between client and server which we cannot with
+-- Data.Cache.Dynamic.
+--
+-- A WARNING though - right now the cache is basically a map from a
+-- type to a single value of that type.  There is no way to store more
+-- than one value and you can only update the entire value associated
+-- with a type.  You can't store more than one value of a given type
+-- (though the type could be a map) and you can't query or update less
+-- than the entire value associated with a type.
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
@@ -40,11 +48,14 @@ module Data.Cache.Encoded
   , anyPathE
   , maybePathE
   , queryEncodedCache
+  , queryEncodedCacheOld
   , updateEncodedCache
+  , updateEncodedCacheOld
   ) where
 
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
 import Control.Lens.Path ((<->), atPath, idPath, nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
+import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Default (Default(def))
@@ -83,9 +94,12 @@ instance Value ByteString where hops _ = [] -- Move to lens-path
 -- Analogues to the Dynamic classes.
 class AnyLensE a where
   anyLensE :: HasCallStack => a -> Lens' EncodedCache a
+  -- ^ Given a default, build a lens that points to the value of that
+  -- type in the 'EncodedCache'
 
--- | Generic lens, allows access to a single @a@ inside a value @s@.
--- It has a default value argument.
+-- | The only instance of 'AnyLensE', builds a lens from
+-- 'EncodedCache' to any instance of 'SafeCopy' (which implies
+-- 'Typeable')
 --
 -- @
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
@@ -104,14 +118,13 @@ instance SafeCopy a => AnyLensE a where
       l3 :: Iso' ByteString a
       l3 = iso decode' safeEncode
       decode' :: ByteString -> a
-      decode' bs = either (\_ -> d {-error ("decode @" <> show (typeRep (Proxy @a)))-}) id (safeDecode bs)
+      decode' bs = either (\_ -> d) id (safeDecode bs)
   {-# INLINE anyLensE #-}
 
 -- | Generic 'Maybe' lens
 class MaybeLensE a where
   maybeLensE :: Lens' EncodedCache (Maybe a)
 
--- | Generic instance of 'AtLens'.
 instance AnyLensE (Maybe a) => MaybeLensE a where
   maybeLensE = anyLensE (Nothing :: Maybe a)
 
@@ -134,11 +147,13 @@ instance (AnyLensE (Map k v), Ord k, Typeable k, Typeable v) => HasMapE k v wher
 defaultLensE :: forall a. (AnyLensE a, Default a, HasCallStack) => Lens' EncodedCache a
 defaultLensE = anyLensE @a def
 
+-- | 'anyLens' for any value with a 'Bounded' instance.
 boundedLensE ::
   forall k v. (AnyLensE (Map k v), Ord k, Typeable k, Typeable v, Bounded v, Eq v, HasCallStack)
   => k -> Lens' EncodedCache v
 boundedLensE k = atLensE @k @v k . non (minBound :: v)
 
+-- | 'anyLens' for any value with a 'Monoid' instance.
 monoidLensE ::
   forall k v. (AnyLensE (Map k v), Ord k, Typeable k, Typeable v, Monoid v, Eq v, HasCallStack)
   => k -> Lens' EncodedCache v
@@ -148,7 +163,8 @@ ixLensE :: forall k v. (AnyLensE (Map k v), Ord k, Typeable k, Typeable v, HasCa
 ixLensE k = atLensE k . _Just
 
 -- | It would be great to have a path that could go from ByteString to
--- the decoded type a, but at the moment we don't.
+-- the decoded type a, but at the moment we don't.  So this stops at
+-- the 'ByteString'.
 anyPathE ::
   forall a. ({-AnyLensE a, Value a, Typeable a,-} SafeCopy a, HasCallStack)
   => a
@@ -160,7 +176,27 @@ maybePathE ::
   => PathTo 'L EncodedCache (Maybe ByteString)
 maybePathE = atPath (typeRepFingerprint (typeRep (Proxy @a)))
 
+-- | Retrieve the encoded cache content for type a from the server.
 queryEncodedCache ::
+  forall db a h e.
+  (Monad h,
+   -- EventHandler h,
+   HasEncodedCachePath db,
+   Member PathError e,
+   MonadError (OneOf e) h,
+   SafeCopy a,
+   HasCallStack)
+  => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
+  -> h (Maybe a)
+queryEncodedCache queryDatumByGetter =
+  queryDatumByGetter (encodedCachePath @db <-> maybePathE @a) >>= \case
+    Nothing -> pure Nothing
+    Just bs ->
+      case safeDecode bs of
+        Left s -> throwError (Errors.set (PathError s))
+        Right m -> pure m
+
+queryEncodedCacheOld ::
   forall db a h e.
   (Monad h,
    -- EventHandler h,
@@ -170,7 +206,7 @@ queryEncodedCache ::
    HasCallStack)
   => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
   -> h (Either (OneOf e) (Maybe a))
-queryEncodedCache queryDatumByGetter =
+queryEncodedCacheOld queryDatumByGetter =
   queryDatumByGetter (encodedCachePath @db <-> maybePathE @a) >>= \case
     Nothing -> pure (Right Nothing)
     Just bs ->
@@ -178,7 +214,19 @@ queryEncodedCache queryDatumByGetter =
         Left s -> pure (Left (Errors.set (PathError s)))
         Right m -> pure (Right m)
 
+-- | Send the encoded cache content for type a to the server.
 updateEncodedCache ::
+  forall db a h e.
+  (HasEncodedCachePath db,
+   SafeCopy a,
+   HasCallStack)
+  => (forall b. Value b => PathToValue 'L db b -> h ())
+  -> Maybe a
+  -> h ()
+updateEncodedCache updateDatumByLens m =
+  updateDatumByLens (PathToValue (encodedCachePath @db <-> maybePathE @a) (fmap safeEncode m))
+
+updateEncodedCacheOld ::
   forall db a h e.
   (HasEncodedCachePath db,
    SafeCopy a,
@@ -186,5 +234,5 @@ updateEncodedCache ::
   => (forall b. Value b => PathToValue 'L db b -> h (Maybe (OneOf e)))
   -> Maybe a
   -> h (Maybe (OneOf e))
-updateEncodedCache updateDatumByLens m =
+updateEncodedCacheOld updateDatumByLens m =
   updateDatumByLens (PathToValue (encodedCachePath @db <-> maybePathE @a) (fmap safeEncode m))

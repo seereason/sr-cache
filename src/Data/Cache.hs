@@ -55,15 +55,9 @@ import Control.Monad.Writer (MonadWriter)
 import Data.Cache.Common
 import Data.Cache.Dynamic as Dyn
 import Data.Cache.Encoded as Enc
-import Data.Dynamic (Dynamic)
 import Data.Generics.Labels ()
-import Data.Generics.Product (field)
 import Data.Map (fromList, Map)
---import Data.SafeCopy (SafeCopy)
-import GHC.Fingerprint (Fingerprint(..))
-import GHC.Generics
 import Test.HUnit
-import Type.Reflection (SomeTypeRep)
 
 -- | If you don't want to use the 'Dyn' declare a 'HasLens'
 -- instance.  This is necessary if you want a persistant value
