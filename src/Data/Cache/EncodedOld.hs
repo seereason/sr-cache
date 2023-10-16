@@ -30,37 +30,39 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
-module Data.Cache.Encoded
+module Data.Cache.EncodedOld
   ( EncodedCache
   , HasEncodedCache(encodedCache)
   , HasEncodedCachePath(encodedCachePath)
+  -- , Enc(Enc), enc
+    -- * Duplicates for encoded
+  , anyLensE
+  , maybeLensE
   , mapLensE
   , atLensE
+  , atLensME
   , defaultLensE
   , boundedLensE
   , monoidLensE
   , ixLensE
-  , mapPathE
-  , atPathE
-  , queryEncodedMap
-  , updateEncodedMap
-  , queryEncodedAt
-  , updateEncodedAt
+  , anyPathE
+  , maybePathE
+  , queryEncodedCache
+  , queryEncodedCacheOld
+  , updateEncodedCache
+  , updateEncodedCacheOld
   ) where
 
-import Control.Exception (ErrorCall)
-import Control.Monad.Catch (MonadCatch, try)
-import Control.Lens (At(at), Iso', iso, _Just, Lens', non, Traversal')
-import Control.Lens.Path ((<->), atPath, idPath, nonPath, upcastOptic, PathTo, OpticTag(L), Value, PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
+import Control.Lens (At(at), Iso', iso, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
+import Control.Lens.Path ((<->), atPath, idPath, nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Default (Default(def))
-import Data.Either (fromRight)
-import Data.Map.Strict (Map, mapKeys)
+import Data.Map.Strict (Map)
 import Data.Proxy (Proxy(Proxy))
 import Data.SafeCopy (SafeCopy)
-import Data.Typeable (typeRep, typeRepFingerprint)
+import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Stack (HasCallStack)
 import SeeReason.Errors as Errors (Member, OneOf, set)
@@ -73,7 +75,7 @@ enc :: Iso' (Enc s) s
 enc = iso (\(Enc s) -> s) Enc
 -}
 
-type EncodedCache = Map Fingerprint (Map ByteString ByteString)
+type EncodedCache = Map Fingerprint ByteString
 
 -- | How to find the encode cache map.
 class HasEncodedCache s where
@@ -86,13 +88,12 @@ instance HasEncodedCachePath EncodedCache where
   encodedCachePath = upcastOptic idPath
 
 -- Analogues to the Dynamic classes.
-class AtLensE k v where
-  mapLensE :: HasCallStack => Lens' EncodedCache (Map k v)
-  atLensE :: HasCallStack => k -> Lens' EncodedCache (Maybe v)
+class AnyLensE a where
+  anyLensE :: HasCallStack => a -> Lens' EncodedCache a
   -- ^ Given a default, build a lens that points to the value of that
   -- type in the 'EncodedCache'
 
--- | The only instance of 'AtLensE', builds a lens from
+-- | The only instance of 'AnyLensE', builds a lens from
 -- 'EncodedCache' to any instance of 'SafeCopy' (which implies
 -- 'Typeable')
 --
@@ -100,29 +101,22 @@ class AtLensE k v where
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
-instance (Ord k, SafeCopy k, SafeCopy v) => AtLensE k v where
-  mapLensE =
-    l1 . l2
+instance SafeCopy a => AnyLensE a where
+  anyLensE d =
+    {-l0 .-} l1 . l2 . l3
     where
-      l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
-      l2 :: Iso' (Map ByteString ByteString) (Map k v)
-      l2 = iso decodeMap encodeMap
-  atLensE k =
-    l1 . l2 . l3
-    where
-      l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
-      l2 :: Lens' (Map ByteString ByteString) (Maybe ByteString)
-      l2 = at (safeEncode k)
-      l3 :: Iso' (Maybe ByteString) (Maybe v)
-      l3 = iso decode' (fmap safeEncode)
-      decode' :: Maybe ByteString -> Maybe v
-      decode' (Just bs) = either (\_ -> Nothing {- This should not happen -}) Just (safeDecode bs)
-      decode' Nothing = Nothing
-  {-# INLINE atLensE #-}
+      -- l0 :: Lens' s EncodedCache
+      -- l0 = encodedCache @s
+      l1 :: Lens' EncodedCache (Maybe ByteString)
+      l1 = at (typeRepFingerprint (typeRep (Proxy @a)))
+      l2 :: Iso' (Maybe ByteString) ByteString
+      l2 = iso (maybe (safeEncode d) id) Just
+      l3 :: Iso' ByteString a
+      l3 = iso decode' safeEncode
+      decode' :: ByteString -> a
+      decode' bs = either (\_ -> d) id (safeDecode bs)
+  {-# INLINE anyLensE #-}
 
-{-
 -- | Generic 'Maybe' lens
 class MaybeLensE a where
   maybeLensE :: Lens' EncodedCache (Maybe a)
@@ -144,117 +138,97 @@ instance (AnyLensE (Map k v), Ord k, Typeable k, Typeable v) => HasMapE k v wher
   atLensME k = do
     k' <- k
     pure $ Lens $ atLensE k'
--}
 
 -- | 'anyLens' for a value with a 'Default' instance.
-defaultLensE :: forall k v. (AtLensE k v, Eq v, Default v, HasCallStack) => k -> Lens' EncodedCache v
-defaultLensE k = atLensE @k @v k . non def
+defaultLensE :: forall a. (AnyLensE a, Default a, HasCallStack) => Lens' EncodedCache a
+defaultLensE = anyLensE @a def
 
 -- | 'anyLens' for any value with a 'Bounded' instance.
 boundedLensE ::
-  forall k v. (AtLensE k v, Bounded v, Eq v, HasCallStack)
+  forall k v. (AnyLensE (Map k v), Ord k, Typeable k, Typeable v, Bounded v, Eq v, HasCallStack)
   => k -> Lens' EncodedCache v
 boundedLensE k = atLensE @k @v k . non (minBound :: v)
 
 -- | 'anyLens' for any value with a 'Monoid' instance.
 monoidLensE ::
-  forall k v. (AtLensE k v, Monoid v, Eq v, HasCallStack)
+  forall k v. (AnyLensE (Map k v), Ord k, Typeable k, Typeable v, Monoid v, Eq v, HasCallStack)
   => k -> Lens' EncodedCache v
 monoidLensE k = atLensE @k @v k . non (mempty :: v)
 
-ixLensE :: forall k v. (AtLensE k v, HasCallStack) => k -> Traversal' EncodedCache v
+ixLensE :: forall k v. (AnyLensE (Map k v), Ord k, Typeable k, Typeable v, HasCallStack) => k -> Traversal' EncodedCache v
 ixLensE k = atLensE k . _Just
-
-mapPathE ::
-  forall k v. (SafeCopy k, SafeCopy v, HasCallStack)
-  => PathTo 'L EncodedCache (Map ByteString ByteString)
-mapPathE =
-  atPath (typeRepFingerprint (typeRep (Proxy @(Map k v)))) <->
-  nonPath mempty
 
 -- | It would be great to have a path that could go from ByteString to
 -- the decoded type a, but at the moment we don't.  So this stops at
 -- the 'ByteString'.
-atPathE ::
-  forall v k. (SafeCopy k, SafeCopy v, HasCallStack)
-  => k
-  -> PathTo 'L EncodedCache (Maybe ByteString)
-atPathE k = mapPathE @k @v <-> atPath (safeEncode k)
+anyPathE ::
+  forall a. ({-AnyLensE a, Value a, Typeable a,-} SafeCopy a, HasCallStack)
+  => a
+  -> PathTo 'L EncodedCache ByteString
+anyPathE d = atPath (typeRepFingerprint (typeRep (Proxy @a))) <-> nonPath (safeEncode d)
+
+maybePathE ::
+  forall a. ({-AnyLensE a, Value a, Typeable a,-} SafeCopy a, HasCallStack)
+  => PathTo 'L EncodedCache (Maybe ByteString)
+maybePathE = atPath (typeRepFingerprint (typeRep (Proxy @a)))
 
 -- | Retrieve the encoded cache content for type a from the server.
-queryEncodedMap ::
-  forall db k v h e.
-  (MonadCatch h,
-   HasEncodedCachePath db,
-   Member PathError e,
-   MonadError (OneOf e) h,
-   Ord k,
-   SafeCopy k,
-   SafeCopy v,
-   HasCallStack)
-  => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
-  -> h (Map k v)
-queryEncodedMap queryDatumByGetter =
-  queryDatumByGetter (encodedCachePath @db <-> mapPathE @k @v) >>= \bs ->
-    try (pure $ decodeMap bs) >>= \case
-      Left (e :: ErrorCall) -> throwError (Errors.set (PathError (show e)))
-      Right m -> pure m
-
-decodeMap :: (Ord k, SafeCopy k, SafeCopy v) => Map ByteString ByteString -> Map k v
-decodeMap =
-  fmap (fromRight (error "decode error") . safeDecode) .
-  mapKeys (fromRight (error "decode error") . safeDecode)
-
-encodeMap :: (SafeCopy k, SafeCopy v) => Map k v -> Map ByteString ByteString
-encodeMap = fmap safeEncode . mapKeys safeEncode
-
--- | Send the encoded cache content for type a to the server.
-updateEncodedMap ::
-  forall db k v h.
-  (HasEncodedCachePath db,
-   SafeCopy k,
-   SafeCopy v,
-   HasCallStack)
-  => (forall b. Value b => PathToValue 'L db b -> h ())
-  -> Map k v
-  -> h ()
-updateEncodedMap updateDatumByLens m =
-  updateDatumByLens (PathToValue
-                      (encodedCachePath @db <-> mapPathE @k @v)
-                      (fmap safeEncode (mapKeys safeEncode m)))
-
--- | Retrieve the encoded cache content for type a from the server.
-queryEncodedAt ::
-  forall db k v h e.
+queryEncodedCache ::
+  forall db a h e.
   (Monad h,
    -- EventHandler h,
    HasEncodedCachePath db,
    Member PathError e,
    MonadError (OneOf e) h,
-   SafeCopy k,
-   SafeCopy v,
+   SafeCopy a,
    HasCallStack)
   => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
-  -> k
-  -> h (Maybe v)
-queryEncodedAt queryDatumByGetter k =
-  queryDatumByGetter (encodedCachePath @db <-> atPathE @v k) >>= \case
+  -> h (Maybe a)
+queryEncodedCache queryDatumByGetter =
+  queryDatumByGetter (encodedCachePath @db <-> maybePathE @a) >>= \case
     Nothing -> pure Nothing
     Just bs ->
       case safeDecode bs of
         Left s -> throwError (Errors.set (PathError s))
         Right m -> pure m
 
+queryEncodedCacheOld ::
+  forall db a h e.
+  (Monad h,
+   -- EventHandler h,
+   HasEncodedCachePath db,
+   Member PathError e,
+   SafeCopy a,
+   HasCallStack)
+  => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
+  -> h (Either (OneOf e) (Maybe a))
+queryEncodedCacheOld queryDatumByGetter =
+  queryDatumByGetter (encodedCachePath @db <-> maybePathE @a) >>= \case
+    Nothing -> pure (Right Nothing)
+    Just bs ->
+      case safeDecode bs of
+        Left s -> pure (Left (Errors.set (PathError s)))
+        Right m -> pure (Right m)
+
 -- | Send the encoded cache content for type a to the server.
-updateEncodedAt ::
-  forall db k v h.
+updateEncodedCache ::
+  forall db a h e.
   (HasEncodedCachePath db,
-   SafeCopy k,
-   SafeCopy v,
+   SafeCopy a,
    HasCallStack)
   => (forall b. Value b => PathToValue 'L db b -> h ())
-  -> k
-  -> Maybe v
+  -> Maybe a
   -> h ()
-updateEncodedAt updateDatumByLens k m =
-  updateDatumByLens (PathToValue (encodedCachePath @db <-> atPathE @v k) (fmap safeEncode m))
+updateEncodedCache updateDatumByLens m =
+  updateDatumByLens (PathToValue (encodedCachePath @db <-> maybePathE @a) (fmap safeEncode m))
+
+updateEncodedCacheOld ::
+  forall db a h e.
+  (HasEncodedCachePath db,
+   SafeCopy a,
+   HasCallStack)
+  => (forall b. Value b => PathToValue 'L db b -> h (Maybe (OneOf e)))
+  -> Maybe a
+  -> h (Maybe (OneOf e))
+updateEncodedCacheOld updateDatumByLens m =
+  updateDatumByLens (PathToValue (encodedCachePath @db <-> maybePathE @a) (fmap safeEncode m))

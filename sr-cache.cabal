@@ -1,5 +1,5 @@
 Name:                sr-cache
-Version:             1.14
+Version:             1.15
 Synopsis:            Safe dynamic caching
 License:             BSD3
 License-file:        LICENSE
@@ -26,7 +26,12 @@ Library
     mtl,
     safecopy,
     sr-errors
-  Exposed-Modules: Data.Cache Data.Cache.Common Data.Cache.Dynamic Data.Cache.Encoded
+  Exposed-Modules:
+    Data.Cache
+    Data.Cache.Common
+    Data.Cache.Dynamic
+    Data.Cache.Encoded
+    Data.Cache.EncodedMaps
   Hs-Source-Dirs: src
 
 Test-Suite cache-tests

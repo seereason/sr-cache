@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -28,7 +29,7 @@ import Data.ByteString (ByteString)
 import Data.Default (Default(def))
 import Data.Map.Strict (Map)
 import Data.SafeCopy (SafeCopy, safeGet, safePut)
-import Data.Serialize (runPut, runGet, Serialize(get, put))
+import Data.Serialize (runPut, runGet, Serialize)
 import Data.Typeable (Typeable)
 import GHC.Generics
 import GHC.Stack (HasCallStack)
@@ -53,6 +54,7 @@ instance Serialize Fingerprint where
 deriving instance Generic Fingerprint
 #endif
 instance SafeCopy Fingerprint
+deriving instance Serialize Fingerprint
 
 -- | Generic lens, allows access to a single @a@ inside a value @s2.
 -- This and other classes in this module are used to break import
