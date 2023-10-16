@@ -54,7 +54,7 @@ module Data.Cache.EncodedOld
   ) where
 
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
-import Control.Lens.Path ((<->), atPath, idPath, nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
+import Control.Lens.Path ((<->), atPath, idPath, nonPath, upcastOptic, PathTo, OpticTag(L), Value, PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
@@ -212,7 +212,7 @@ queryEncodedCacheOld queryDatumByGetter =
 
 -- | Send the encoded cache content for type a to the server.
 updateEncodedCache ::
-  forall db a h e.
+  forall db a h.
   (HasEncodedCachePath db,
    SafeCopy a,
    HasCallStack)

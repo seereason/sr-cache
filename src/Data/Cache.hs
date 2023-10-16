@@ -36,8 +36,6 @@ module Data.Cache
   , boundedLens
   , monoidLens
   -- * Encoded duplicates
-  , anyLensE
-  , maybeLensE
   , atLensE
   , defaultLensE
   , boundedLensE
@@ -49,7 +47,7 @@ module Data.Cache
   , tests
   ) where
 
-import Control.Lens ((.=), at, Lens', use)
+import Control.Lens ((.=), at, Lens', non, use)
 import Control.Monad.RWS (evalRWS, RWS, tell)
 import Control.Monad.Writer (MonadWriter)
 import Data.Cache.Common
@@ -97,10 +95,10 @@ cacheTestsE :: s ~ EncodedCache => RWS () [Test] s ()
 cacheTestsE = do
   mapLensE .= (fromList [('a',3),('b',5)] :: Map Char Int)
   mapLensE .= (fromList [(4,'a'),(7,'b')] :: Map Int Char)
-  (tellAE "test0" 3.1416) =<< use (anyLensE (3.1416 :: Double))
-  (tellAE "test0b" (Nothing :: Maybe Float)) =<< use (maybeLensE @Float)
-  maybeLensE .= Just (3.1416 :: Float)
-  (tellAE "test0c" (Just 3.1416 :: Maybe Float)) =<< use (maybeLensE @Float)
+  (tellAE "test0" 3.1416) =<< use (atLensE () . non (3.1416 :: Double))
+  (tellAE "test0b" (Nothing :: Maybe Float)) =<< use (atLensE @_ @Float ())
+  atLensE () .= Just (3.1416 :: Float)
+  (tellAE "test0c" (Just 3.1416 :: Maybe Float)) =<< use (atLensE @_ @Float ())
   (tellAE "test1" (fromList [('a',3),('b',5)])) =<< use (mapLensE @Char @Int)
   (tellAE "test2" (Just 5)) =<< use (atLensE @Char @Int 'b')
   (tellAE "test3" (Just 5)) =<< use (mapLensE @Char @Int . at 'b')
