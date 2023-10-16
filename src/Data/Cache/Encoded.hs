@@ -79,7 +79,13 @@ enc = iso (\(Enc s) -> s) Enc
 
 newtype EncodedCache =
   EncodedCache {unEncodedCache :: Map Fingerprint (Map ByteString ByteString)}
-  deriving (Generic, Serialize, SafeCopy, Show, Eq, Ord, Semigroup, Monoid)
+  deriving (Generic, Serialize, SafeCopy, Show, Eq, Ord)
+
+instance Monoid EncodedCache where
+  mempty = EncodedCache mempty
+
+instance Semigroup EncodedCache where
+  EncodedCache a <> EncodedCache b = EncodedCache (a <> b)
 
 instance Value EncodedCache where hops _ = [NewtypeType]
 
