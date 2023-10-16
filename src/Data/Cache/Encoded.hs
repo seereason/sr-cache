@@ -22,6 +22,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -51,17 +52,20 @@ module Data.Cache.Encoded
 import Control.Exception (ErrorCall)
 import Control.Monad.Catch (MonadCatch, try)
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, Traversal')
-import Control.Lens.Path ((<->), atPath, idPath, nonPath, upcastOptic, PathTo, OpticTag(L), Value, PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
+import Control.Lens.Path ((<->), atPath, HopType(NewtypeType), idPath, newtypePath, nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Default (Default(def))
 import Data.Either (fromRight)
+import Data.Generics.Labels ()
 import Data.Map.Strict (Map, mapKeys)
 import Data.Proxy (Proxy(Proxy))
 import Data.SafeCopy (SafeCopy)
+import Data.Serialize (Serialize)
 import Data.Typeable (typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
+import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import SeeReason.Errors as Errors (Member, OneOf, set)
 
@@ -73,7 +77,11 @@ enc :: Iso' (Enc s) s
 enc = iso (\(Enc s) -> s) Enc
 -}
 
-type EncodedCache = Map Fingerprint (Map ByteString ByteString)
+newtype EncodedCache =
+  EncodedCache {unEncodedCache :: Map Fingerprint (Map ByteString ByteString)}
+  deriving (Generic, Serialize, SafeCopy, Show, Eq, Ord, Semigroup, Monoid)
+
+instance Value EncodedCache where hops _ = [NewtypeType]
 
 -- | How to find the encode cache map.
 class HasEncodedCache s where
@@ -105,14 +113,14 @@ instance (Ord k, SafeCopy k, SafeCopy v) => AtLensE k v where
     l1 . l2
     where
       l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
+      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
       l2 :: Iso' (Map ByteString ByteString) (Map k v)
       l2 = iso decodeMap encodeMap
   atLensE k =
     l1 . l2 . l3
     where
       l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
+      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
       l2 :: Lens' (Map ByteString ByteString) (Maybe ByteString)
       l2 = at (safeEncode k)
       l3 :: Iso' (Maybe ByteString) (Maybe v)
@@ -169,6 +177,7 @@ mapPathE ::
   forall k v. (SafeCopy k, SafeCopy v, HasCallStack)
   => PathTo 'L EncodedCache (Map ByteString ByteString)
 mapPathE =
+  newtypePath <->
   atPath (typeRepFingerprint (typeRep (Proxy @(Map k v)))) <->
   nonPath mempty
 
