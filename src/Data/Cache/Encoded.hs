@@ -89,7 +89,6 @@ instance HasEncodedCachePath EncodedCache where
   encodedCachePath = upcastOptic idPath
 
 deriving instance Serialize Fingerprint
-instance Value ByteString where hops _ = [] -- Move to lens-path
 
 -- Analogues to the Dynamic classes.
 class AnyLensE a where

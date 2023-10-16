@@ -1,5 +1,5 @@
 Name:                sr-cache
-Version:             1.13
+Version:             1.14
 Synopsis:            Safe dynamic caching
 License:             BSD3
 License-file:        LICENSE
@@ -13,7 +13,19 @@ Build-Type:          Simple
 Cabal-Version:       >= 1.10
 
 Library
-  Build-Depends: base, bytestring, cereal, containers, data-default, generic-lens, HUnit, lens, lens-path, mtl, safecopy, sr-errors
+  Build-Depends:
+    base,
+    bytestring,
+    cereal,
+    containers,
+    data-default,
+    generic-lens,
+    HUnit,
+    lens,
+    lens-path >= 3.31,
+    mtl,
+    safecopy,
+    sr-errors
   Exposed-Modules: Data.Cache Data.Cache.Common Data.Cache.Dynamic Data.Cache.Encoded
   Hs-Source-Dirs: src
 
