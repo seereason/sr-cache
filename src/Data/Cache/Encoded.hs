@@ -16,6 +16,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -56,6 +57,7 @@ import Control.Lens.Path ((<->), atPath, HopType(NewtypeType), idPath, newtypePa
 import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
+import Data.Data (Data)
 import Data.Default (Default(def))
 import Data.Either (fromRight)
 import Data.Generics.Labels ()
@@ -63,7 +65,7 @@ import Data.Map.Strict (Map, mapKeys)
 import Data.Proxy (Proxy(Proxy))
 import Data.SafeCopy (SafeCopy)
 import Data.Serialize (Serialize)
-import Data.Typeable (typeRep, typeRepFingerprint)
+import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
@@ -79,7 +81,7 @@ enc = iso (\(Enc s) -> s) Enc
 
 newtype EncodedCache =
   EncodedCache {unEncodedCache :: Map Fingerprint (Map ByteString ByteString)}
-  deriving (Generic, Serialize, SafeCopy, Show, Eq, Ord)
+  deriving (Generic, Serialize, SafeCopy, Show, Eq, Ord, Data, Typeable)
 
 instance Monoid EncodedCache where
   mempty = EncodedCache mempty

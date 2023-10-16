@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -26,6 +27,7 @@ module Data.Cache.Common
 
 import Control.Lens (at, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
 import Data.ByteString (ByteString)
+import Data.Data (Data)
 import Data.Default (Default(def))
 import Data.Map.Strict (Map)
 import Data.SafeCopy (SafeCopy, safeGet, safePut)
@@ -53,6 +55,7 @@ instance Serialize Fingerprint where
 #if !MIN_VERSION_base(4,16,0)
 deriving instance Generic Fingerprint
 #endif
+deriving instance Data Fingerprint
 instance SafeCopy Fingerprint
 deriving instance Serialize Fingerprint
 
