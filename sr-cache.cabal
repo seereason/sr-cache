@@ -19,6 +19,7 @@ Library
     cereal,
     containers,
     data-default,
+    exceptions,
     generic-lens,
     HUnit,
     lens,
