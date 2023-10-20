@@ -53,7 +53,7 @@ module Data.Cache.Encoded
 import Control.Exception (ErrorCall)
 import Control.Monad.Catch (MonadCatch, try)
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, Traversal')
-import Control.Lens.Path ((<->), atPath, HopType(NewtypeType), idPath, newtypePath, nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
+import Control.Lens.Path ((<->), atPath, HopType(NewtypeType), idPath, newtypePath, nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError), OpticTag(G), PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
@@ -209,7 +209,7 @@ queryEncodedMap ::
    SafeCopy k,
    SafeCopy v,
    HasCallStack)
-  => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
+  => (forall o b. (Value b, IsGetterTag o) => PathTo o db b -> h b)
   -> h (Map k v)
 queryEncodedMap queryDatumByGetter =
   queryDatumByGetter (encodedCachePath @db <-> mapPathE @k @v) >>= \bs ->
@@ -251,7 +251,7 @@ queryEncodedAt ::
    SafeCopy k,
    SafeCopy v,
    HasCallStack)
-  => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
+  => (forall b o. (Value b, IsGetterTag o) => PathTo o db b -> h b)
   -> k
   -> h (Maybe v)
 queryEncodedAt queryDatumByGetter k =
