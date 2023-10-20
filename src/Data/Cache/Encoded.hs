@@ -246,6 +246,8 @@ updateEncodedMap updateDatumByLens m =
 queryEncodedAt ::
   forall db k v h e.
   (Monad h,
+   MonadIO h,
+   Value db,
    -- EventHandler h,
    HasEncodedCachePath db,
    Member PathError e,
@@ -258,11 +260,11 @@ queryEncodedAt ::
   -> h (Maybe v)
 queryEncodedAt queryDatumByGetter k =
   queryDatumByGetter (encodedCachePath @db <-> atPathE @v k) >>= \case
-    Nothing -> pure Nothing
+    Nothing -> pure Nothing                             -- is a clean
     Just bs ->
       case safeDecode bs of
-        Left s -> throwError (Errors.set (PathError s))
-        Right m -> pure m
+        Left s -> throwError (Errors.set (PathError s)) -- is a dirty
+        Right m -> pure (Just m)                        -- is a clean
 
 -- | Send the encoded cache content for type a to the server.
 updateEncodedAt ::
