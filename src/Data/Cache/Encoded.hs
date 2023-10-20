@@ -56,7 +56,7 @@ import Control.Lens.Path
   ((<->), atPath, HopType(NewtypeType), idPath, IsGetterTag, newtypePath,
    nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError),
    PathToValue(PathToValue))
-import Control.Monad.Except (MonadError, throwError)
+import Control.Monad.Except (MonadError, MonadIO, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Data (Data)
