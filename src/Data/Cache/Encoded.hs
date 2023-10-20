@@ -30,7 +30,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache.Encoded
   ( EncodedCache
@@ -53,7 +52,10 @@ module Data.Cache.Encoded
 import Control.Exception (ErrorCall)
 import Control.Monad.Catch (MonadCatch, try)
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, Traversal')
-import Control.Lens.Path ((<->), atPath, HopType(NewtypeType), idPath, newtypePath, nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError), OpticTag(G), PathToValue(PathToValue))
+import Control.Lens.Path
+  ((<->), atPath, HopType(NewtypeType), idPath, IsGetterTag, newtypePath,
+   nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError),
+   PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
