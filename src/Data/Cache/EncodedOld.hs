@@ -54,7 +54,7 @@ module Data.Cache.EncodedOld
   ) where
 
 import Control.Lens (At(at), Iso', iso, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
-import Control.Lens.Path ((<->), atPath, idPath, nonPath, upcastOptic, PathTo, OpticTag(L), Value, PathError(PathError), UpcastOptic, OpticTag(G), PathToValue(PathToValue))
+import Control.Lens.Path ((<->), atPath, idPath, IsGetterTag, nonPath, upcastOptic, PathTo, OpticTag(L), Value, PathError(PathError), PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, throwError)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
@@ -182,7 +182,7 @@ queryEncodedCache ::
    MonadError (OneOf e) h,
    SafeCopy a,
    HasCallStack)
-  => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
+  => (forall o b. (IsGetterTag o, Value b) => PathTo o db b -> h b)
   -> h (Maybe a)
 queryEncodedCache queryDatumByGetter =
   queryDatumByGetter (encodedCachePath @db <-> maybePathE @a) >>= \case
@@ -200,7 +200,7 @@ queryEncodedCacheOld ::
    Member PathError e,
    SafeCopy a,
    HasCallStack)
-  => (forall o b. (UpcastOptic 'G o, Value b) => PathTo o db b -> h b)
+  => (forall o b. (IsGetterTag o, Value b) => PathTo o db b -> h b)
   -> h (Either (OneOf e) (Maybe a))
 queryEncodedCacheOld queryDatumByGetter =
   queryDatumByGetter (encodedCachePath @db <-> maybePathE @a) >>= \case
