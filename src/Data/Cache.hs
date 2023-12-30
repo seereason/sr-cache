@@ -41,8 +41,6 @@ module Data.Cache
   , boundedLensE
   , monoidLensE
   , ixLensE
-  -- * Non-generic (overridable) lens classes
-  , HasLens(hasLens)
   -- * Tests
   , tests
   ) where
@@ -56,13 +54,6 @@ import Data.Cache.Encoded as Enc
 import Data.Generics.Labels ()
 import Data.Map (fromList, Map)
 import Test.HUnit
-
--- | If you don't want to use the 'Dyn' declare a 'HasLens'
--- instance.  This is necessary if you want a persistant value
--- (Dyn has no Serialize instance) or because you already
--- have a location (not in Dyn) where the value is stored.
-class HasLens s a where
-  hasLens :: Lens' s a
 
 -- runTestTT tests
 tests :: Test
