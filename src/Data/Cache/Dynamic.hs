@@ -24,14 +24,16 @@ module Data.Cache.Dynamic
 
 import Control.Lens (At(at), Iso', iso, Lens')
 import Data.Cache.Common
-import Data.Dynamic (Dynamic, fromDynamic, toDyn)
+import Extra.DynamicG (Dynamic, fromDynamic, toDyn)
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy(Proxy))
+import Data.SafeCopy (SafeCopy)
+import Data.Serialize (Serialize)
 import Data.Typeable (Typeable)
--- import GHC.Generics
+import GHC.Generics
 -- import GHC.Stack (HasCallStack)
-import Type.Reflection (SomeTypeRep, someTypeRep, typeRep)
+import Type.Reflection (SomeTypeRep, someTypeRep)
 
 {-
 -- | A map from a type fingerprint ('SomeTypeRep') to a wrapped value ('Dynamic') of that type.
@@ -56,7 +58,7 @@ instance HasDynamicCache DynamicCache where
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
-instance (Typeable a, HasDynamicCache s) => AnyLens s a where
+instance (Typeable a, SafeCopy a, Serialize a, Show a, HasDynamicCache s) => AnyLens s a where
   anyLens d =
     l0 . l1 . l2 . l3
     where
