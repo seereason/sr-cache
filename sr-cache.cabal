@@ -27,7 +27,7 @@ Library
     mtl,
     safecopy,
     sr-errors,
-    sr-utils >= 1.103
+    sr-utils
   Exposed-Modules:
     Data.Cache
     Data.Cache.Common
