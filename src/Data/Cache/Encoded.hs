@@ -51,9 +51,9 @@ module Data.Cache.Encoded
 
 import Control.Exception (ErrorCall)
 import Control.Monad.Catch (MonadCatch, try)
-import Control.Lens (At(at), Iso', iso, _Just, Lens', non, Traversal')
+import Control.Lens (_1, At(at), Iso', iso, _Just, Lens', non, Traversal')
 import Control.Lens.Path
-  ((<->), atPath, HopType(NewtypeType), idPath, IsGetterTag, newtypePath,
+  ((<->), atPath, fstPath, HopType(NewtypeType), idPath, IsGetterTag, newtypePath,
    nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError),
    PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, MonadIO, throwError)
@@ -65,7 +65,7 @@ import Data.Either (fromRight)
 import Data.Generics.Labels ()
 import Data.Map.Strict (Map, mapKeys)
 import Data.Proxy (Proxy(Proxy))
-import Data.SafeCopy (SafeCopy)
+import Data.SafeCopy (base, extension, SafeCopy(version, kind), Migrate(..))
 import Data.Serialize (Serialize)
 import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
@@ -81,9 +81,22 @@ enc :: Iso' (Enc s) s
 enc = iso (\(Enc s) -> s) Enc
 -}
 
+newtype EncodedCache_0 =
+  EncodedCache_0 {unEncodedCache_0 :: Map Fingerprint (Map ByteString ByteString)}
+  deriving (Generic, Show, Eq, Ord, Data, Typeable)
+
+instance SafeCopy EncodedCache_0 where version = 0; kind = base
+deriving instance Serialize EncodedCache_0
+instance Migrate EncodedCache where
+  type MigrateFrom EncodedCache = EncodedCache_0
+  migrate (EncodedCache_0 mp) = EncodedCache (fmap (\m -> (m, "Unknown")) mp)
+
 newtype EncodedCache =
-  EncodedCache {unEncodedCache :: Map Fingerprint (Map ByteString ByteString)}
-  deriving (Generic, Serialize, SafeCopy, Show, Eq, Ord, Data, Typeable)
+  EncodedCache {unEncodedCache :: Map Fingerprint (Map ByteString ByteString, String {- human readable type info -})}
+  deriving (Generic, Show, Eq, Ord, Data, Typeable)
+
+instance SafeCopy EncodedCache where version = 1; kind = extension
+deriving instance Serialize EncodedCache
 
 instance Monoid EncodedCache where
   mempty = EncodedCache mempty
@@ -123,14 +136,14 @@ instance (Ord k, SafeCopy k, SafeCopy v) => AtLensE k v where
     l1 . l2
     where
       l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
+      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
       l2 :: Iso' (Map ByteString ByteString) (Map k v)
       l2 = iso decodeMap encodeMap
   atLensE k =
     l1 . l2 . l3
     where
       l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty
+      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
       l2 :: Lens' (Map ByteString ByteString) (Maybe ByteString)
       l2 = at (safeEncode k)
       l3 :: Iso' (Maybe ByteString) (Maybe v)
@@ -185,11 +198,11 @@ ixLensE k = atLensE k . _Just
 
 mapPathE ::
   forall k v. (SafeCopy k, SafeCopy v, HasCallStack)
-  => PathTo 'L EncodedCache (Map ByteString ByteString)
+  => PathTo 'L EncodedCache (Map ByteString ByteString, String)
 mapPathE =
   newtypePath <->
   atPath (typeRepFingerprint (typeRep (Proxy @(Map k v)))) <->
-  nonPath mempty
+  nonPath (mempty, show (typeRep (Proxy @(Map k v))))
 
 -- | It would be great to have a path that could go from ByteString to
 -- the decoded type a, but at the moment we don't.  So this stops at
@@ -198,7 +211,7 @@ atPathE ::
   forall v k. (SafeCopy k, SafeCopy v, HasCallStack)
   => k
   -> PathTo 'L EncodedCache (Maybe ByteString)
-atPathE k = mapPathE @k @v <-> atPath (safeEncode k)
+atPathE k = mapPathE @k @v <-> fstPath <-> atPath (safeEncode k)
 
 -- | Retrieve the encoded cache content for type a from the server.
 queryEncodedMap ::
@@ -214,7 +227,7 @@ queryEncodedMap ::
   => (forall o b. (Value b, IsGetterTag o) => PathTo o db b -> h b)
   -> h (Map k v)
 queryEncodedMap queryDatumByGetter =
-  queryDatumByGetter (encodedCachePath @db <-> mapPathE @k @v) >>= \bs ->
+  queryDatumByGetter (encodedCachePath @db <-> mapPathE @k @v <-> fstPath) >>= \bs ->
     try (pure $ decodeMap bs) >>= \case
       Left (e :: ErrorCall) -> throwError (Errors.set (PathError (show e)))
       Right m -> pure m
@@ -239,7 +252,7 @@ updateEncodedMap ::
   -> h ()
 updateEncodedMap updateDatumByLens m =
   updateDatumByLens (PathToValue
-                      (encodedCachePath @db <-> mapPathE @k @v)
+                      (encodedCachePath @db <-> mapPathE @k @v <-> fstPath)
                       (fmap safeEncode (mapKeys safeEncode m)))
 
 -- | Retrieve the encoded cache content for type a from the server.

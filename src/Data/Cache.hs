@@ -45,7 +45,7 @@ module Data.Cache
   , tests
   ) where
 
-import Control.Lens ((.=), at, Lens', non, use)
+import Control.Lens ((.=), at, non, use)
 import Control.Monad.RWS (evalRWS, RWS, tell)
 import Control.Monad.Writer (MonadWriter)
 import Data.Cache.Common
