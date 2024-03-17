@@ -20,7 +20,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -32,7 +31,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Data.Cache.Encoded
-  ( EncodedCache
+  ( EncodedCache(..)
   , HasEncodedCache(encodedCache)
   , HasEncodedCachePath(encodedCachePath)
   , mapLensE
@@ -65,8 +64,8 @@ import Data.Either (fromRight)
 import Data.Generics.Labels ()
 import Data.Map.Strict (Map, mapKeys)
 import Data.Proxy (Proxy(Proxy))
-import Data.SafeCopy (base, extension, SafeCopy(version, kind), Migrate(..))
-import Data.Serialize (Serialize)
+import Data.SafeCopy (base, extension, SafeCopy(version, kind), Migrate(..), safeGet, safePut)
+import Data.Serialize (Serialize(get, put))
 import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics (Generic)
@@ -89,14 +88,14 @@ instance SafeCopy EncodedCache_0 where version = 0; kind = base
 deriving instance Serialize EncodedCache_0
 instance Migrate EncodedCache where
   type MigrateFrom EncodedCache = EncodedCache_0
-  migrate (EncodedCache_0 mp) = EncodedCache (fmap (\m -> (m, "Unknown")) mp)
+  migrate (EncodedCache_0 mp) = EncodedCache (fmap (\m -> (m, Nothing)) mp)
 
 newtype EncodedCache =
-  EncodedCache {unEncodedCache :: Map Fingerprint (Map ByteString ByteString, String {- human readable type info -})}
+  EncodedCache {unEncodedCache :: Map Fingerprint (Map ByteString ByteString, Maybe String {- human readable type info -})}
   deriving (Generic, Show, Eq, Ord, Data, Typeable)
 
 instance SafeCopy EncodedCache where version = 1; kind = extension
-deriving instance Serialize EncodedCache
+instance Serialize EncodedCache where get = safeGet; put = safePut
 
 instance Monoid EncodedCache where
   mempty = EncodedCache mempty
@@ -198,11 +197,11 @@ ixLensE k = atLensE k . _Just
 
 mapPathE ::
   forall k v. (SafeCopy k, SafeCopy v, HasCallStack)
-  => PathTo 'L EncodedCache (Map ByteString ByteString, String)
+  => PathTo 'L EncodedCache (Map ByteString ByteString, Maybe String)
 mapPathE =
   newtypePath <->
   atPath (typeRepFingerprint (typeRep (Proxy @(Map k v)))) <->
-  nonPath (mempty, show (typeRep (Proxy @(Map k v))))
+  nonPath (mempty, Just (show (typeRep (Proxy @(Map k v)))))
 
 -- | It would be great to have a path that could go from ByteString to
 -- the decoded type a, but at the moment we don't.  So this stops at
@@ -260,7 +259,7 @@ queryEncodedAt ::
   forall db k v h e.
   (Monad h,
    MonadIO h,
-   Value db,
+   -- Value db,
    -- EventHandler h,
    HasEncodedCachePath db,
    Member PathError e,
