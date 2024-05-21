@@ -115,84 +115,54 @@ class HasEncodedCachePath s where
 instance HasEncodedCachePath EncodedCache where
   encodedCachePath = upcastOptic idPath
 
--- Analogues to the Dynamic classes.
-class AtLensE k v where
-  mapLensE :: HasCallStack => Lens' EncodedCache (Map k v)
-  atLensE :: HasCallStack => k -> Lens' EncodedCache (Maybe v)
-  -- ^ Given a default, build a lens that points to the value of that
-  -- type in the 'EncodedCache'
+mapLensE :: forall k v. (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => Lens' EncodedCache (Map k v)
+mapLensE =
+  l1 . l2
+  where
+    l1 :: Lens' EncodedCache (Map ByteString ByteString)
+    l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
+    l2 :: Iso' (Map ByteString ByteString) (Map k v)
+    l2 = iso decodeMap encodeMap
 
--- | The only instance of 'AtLensE', builds a lens from
--- 'EncodedCache' to any instance of 'SafeCopy' (which implies
--- 'Typeable')
+-- | Given a default, build a lens that points to the value of that
+-- type in the 'EncodedCache'
 --
 -- @
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
-instance (Ord k, SafeCopy k, SafeCopy v) => AtLensE k v where
-  mapLensE =
-    l1 . l2
-    where
-      l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
-      l2 :: Iso' (Map ByteString ByteString) (Map k v)
-      l2 = iso decodeMap encodeMap
-  atLensE k =
-    l1 . l2 . l3
-    where
-      l1 :: Lens' EncodedCache (Map ByteString ByteString)
-      l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
-      l2 :: Lens' (Map ByteString ByteString) (Maybe ByteString)
-      l2 = at (safeEncode k)
-      l3 :: Iso' (Maybe ByteString) (Maybe v)
-      l3 = iso decode' (fmap safeEncode)
-      decode' :: Maybe ByteString -> Maybe v
-      decode' (Just bs) = either (\_ -> Nothing {- This should not happen -}) Just (safeDecode bs)
-      decode' Nothing = Nothing
-  {-# INLINE atLensE #-}
-
-{-
--- | Generic 'Maybe' lens
-class MaybeLensE a where
-  maybeLensE :: Lens' EncodedCache (Maybe a)
-
-instance AnyLensE (Maybe a) => MaybeLensE a where
-  maybeLensE = anyLensE (Nothing :: Maybe a)
-
--- | Generic 'Map' lens.
-class HasMapE k v where
-  mapLensE :: HasCallStack => Lens' EncodedCache (Map k v)
-  atLensE :: HasCallStack => k -> Lens' EncodedCache (Maybe v)
-  -- ^ Accees an element of a map
-  atLensME :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' EncodedCache (Maybe v))
-
--- | Generic instance of 'HasMapE'.
-instance (AnyLensE (Map k v), Ord k, Typeable k, Typeable v) => HasMapE k v where
-  mapLensE = anyLensE mempty
-  atLensE k = mapLensE @k @v . at k
-  atLensME k = do
-    k' <- k
-    pure $ Lens $ atLensE k'
--}
+atLensE :: forall k v. (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => k -> Lens' EncodedCache (Maybe v)
+atLensE k =
+  l1 . l2 . l3
+  where
+    l1 :: Lens' EncodedCache (Map ByteString ByteString)
+    l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
+    l2 :: Lens' (Map ByteString ByteString) (Maybe ByteString)
+    l2 = at (safeEncode k)
+    l3 :: Iso' (Maybe ByteString) (Maybe v)
+    l3 = iso decode' (fmap safeEncode)
+    decode' :: Maybe ByteString -> Maybe v
+    decode' (Just bs) = either (\_ -> Nothing {- This should not happen -}) Just (safeDecode bs)
+    decode' Nothing = Nothing
+{-# INLINE atLensE #-}
 
 -- | 'anyLens' for a value with a 'Default' instance.
-defaultLensE :: forall k v. (AtLensE k v, Eq v, Default v, HasCallStack) => k -> Lens' EncodedCache v
+defaultLensE :: forall k v. (Ord k, SafeCopy k, Eq v, SafeCopy v, Default v, HasCallStack) => k -> Lens' EncodedCache v
 defaultLensE k = atLensE @k @v k . non def
 
 -- | 'anyLens' for any value with a 'Bounded' instance.
 boundedLensE ::
-  forall k v. (AtLensE k v, Bounded v, Eq v, HasCallStack)
+  forall k v. (Ord k, SafeCopy k, SafeCopy v, Bounded v, Eq v, HasCallStack)
   => k -> Lens' EncodedCache v
 boundedLensE k = atLensE @k @v k . non (minBound :: v)
 
 -- | 'anyLens' for any value with a 'Monoid' instance.
 monoidLensE ::
-  forall k v. (AtLensE k v, Monoid v, Eq v, HasCallStack)
+  forall k v. (Ord k, SafeCopy k, SafeCopy v, Monoid v, Eq v, HasCallStack)
   => k -> Lens' EncodedCache v
 monoidLensE k = atLensE @k @v k . non (mempty :: v)
 
-ixLensE :: forall k v. (AtLensE k v, HasCallStack) => k -> Traversal' EncodedCache v
+ixLensE :: forall k v. (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => k -> Traversal' EncodedCache v
 ixLensE k = atLensE k . _Just
 
 mapPathE ::

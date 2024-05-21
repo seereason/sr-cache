@@ -16,13 +16,6 @@
 module Data.Cache.Common
   ( safeEncode
   , safeDecode
-  , AnyLens(anyLens)
-  , MaybeLens(maybeLens)
-  , HasMap(mapLens, atLens, atLensM)
-  , defaultLens
-  , boundedLens
-  , monoidLens
-  , ixLens
   ) where
 
 import Control.Lens (at, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
@@ -58,50 +51,3 @@ deriving instance Generic Fingerprint
 deriving instance Data Fingerprint
 instance SafeCopy Fingerprint
 deriving instance Serialize Fingerprint
-
--- | Generic lens, allows access to a single @a@ inside a value @s2.
--- This and other classes in this module are used to break import
--- cycles by allowing the use of s without actually having its
--- declaration.
-class AnyLens s a where
-  anyLens :: HasCallStack => a -> Lens' s a
-
--- | Generic 'Maybe' lens
-class MaybeLens s a where
-  maybeLens :: Lens' s (Maybe a)
-
--- | Generic instance of 'AtLens'.
-instance AnyLens s (Maybe a) => MaybeLens s a where
-  maybeLens = anyLens (Nothing :: Maybe a)
-
--- | Generic 'Map' lens.
-class HasMap k v s where
-  mapLens :: HasCallStack => Lens' s (Map k v)
-  atLens :: HasCallStack => k -> Lens' s (Maybe v)
-  -- ^ Accees an element of a map
-  atLensM :: (Monad m, HasCallStack) => m k -> m (ReifiedLens' s (Maybe v))
-
--- | Generic instance of 'HasMap'.
-instance (AnyLens s (Map k v), Ord k, Typeable k, Typeable v) => HasMap k v s where
-  mapLens = anyLens mempty
-  atLens k = mapLens @k @v . at k
-  atLensM k = do
-    k' <- k
-    pure $ Lens $ atLens k'
-
--- | 'anyLens' for a value with a 'Default' instance.
-defaultLens :: forall a s. (AnyLens s a, Default a, HasCallStack) => Lens' s a
-defaultLens = Data.Cache.Common.anyLens @s @a def
-
-boundedLens ::
-  forall k v s. (AnyLens s (Map k v), Ord k, Typeable k, Typeable v, Bounded v, Eq v, HasCallStack)
-  => k -> Lens' s v
-boundedLens k = Data.Cache.Common.atLens @k @v k . non (minBound :: v)
-
-monoidLens ::
-  forall k v s. (AnyLens s (Map k v), Ord k, Typeable k, Typeable v, Monoid v, Eq v, HasCallStack)
-  => k -> Lens' s v
-monoidLens k = Data.Cache.Common.atLens @k @v k . non (mempty :: v)
-
-ixLens :: forall k v s. (AnyLens s (Map k v), Ord k, Typeable k, Typeable v, HasCallStack) => k -> Traversal' s v
-ixLens k = atLens k . _Just

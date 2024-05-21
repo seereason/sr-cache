@@ -48,7 +48,7 @@ module Data.Cache
 import Control.Lens ((.=), at, non, use)
 import Control.Monad.RWS (evalRWS, RWS, tell)
 import Control.Monad.Writer (MonadWriter)
-import Data.Cache.Common
+-- import Data.Cache.Common
 import Data.Cache.Dynamic as Dyn
 import Data.Cache.Encoded as Enc
 import Data.Generics.Labels ()
