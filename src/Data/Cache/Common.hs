@@ -18,16 +18,11 @@ module Data.Cache.Common
   , safeDecode
   ) where
 
-import Control.Lens (at, _Just, Lens', non, ReifiedLens(Lens), ReifiedLens', Traversal')
 import Data.ByteString (ByteString)
 import Data.Data (Data)
-import Data.Default (Default(def))
-import Data.Map.Strict (Map)
 import Data.SafeCopy (SafeCopy, safeGet, safePut)
 import Data.Serialize (runPut, runGet, Serialize)
-import Data.Typeable (Typeable)
 import GHC.Generics
-import GHC.Stack (HasCallStack)
 import GHC.Fingerprint (Fingerprint(..))
 
 -- | Serialize a value using a type's SafeCopy instance.

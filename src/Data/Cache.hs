@@ -24,6 +24,7 @@ module Data.Cache
   ( HasDynamicCache(dynamicCache), DynamicCache
   , HasEncodedCache(encodedCache), EncodedCache
   , HasEncodedCachePath(encodedCachePath)
+  , HasTypeableCache(typeableCache), TypeableCache, TypeableValue
   -- , Dyn(Dyn), Enc(Enc)
   -- * For Dynamic
   , anyLens
@@ -43,6 +44,7 @@ module Data.Cache
   , ixLensE
   ) where
 
-import Data.Cache.Common
-import Data.Cache.Dynamic as Dyn
-import Data.Cache.Encoded as Enc
+import Data.Cache.Common ()
+import Data.Cache.Dynamic
+import Data.Cache.Encoded
+import Data.Cache.Typeable
