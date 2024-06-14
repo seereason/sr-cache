@@ -33,6 +33,7 @@ Library
     Data.Cache.Common
     Data.Cache.Dynamic
     Data.Cache.Encoded
+    Data.Cache.Tests
   Hs-Source-Dirs: src
 
 Test-Suite cache-tests
