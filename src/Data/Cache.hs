@@ -21,17 +21,15 @@
 {-# OPTIONS -Wall -Wredundant-constraints #-}
 
 module Data.Cache
-  ( HasDynamicCache(dynamicCache), DynamicCache
+  ( HasDynamicCache(dynamicCache), DynamicCache, DynamicValue
   , HasEncodedCache(encodedCache), EncodedCache
   , HasEncodedCachePath(encodedCachePath)
-  , HasTypeableCache(typeableCache), TypeableCache, TypeableValue
   -- , Dyn(Dyn), Enc(Enc)
   -- * For Dynamic
   , anyLens
   , maybeLens
   , mapLens
   , atLens
-  , atLensM
   , ixLens
   , defaultLens
   , boundedLens
@@ -47,4 +45,3 @@ module Data.Cache
 import Data.Cache.Common ()
 import Data.Cache.Dynamic
 import Data.Cache.Encoded
-import Data.Cache.Typeable

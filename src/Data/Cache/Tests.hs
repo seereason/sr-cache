@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -22,6 +23,11 @@ tests = TestList [dynTests, encTests]
 dynTests :: Test
 dynTests =
   TestList $ snd $ evalRWS cacheTests () (mempty :: DynamicCache)
+
+instance DynamicValue (Map Char Int)
+instance DynamicValue (Map Int Char)
+instance DynamicValue Double
+instance DynamicValue (Maybe Float)
 
 cacheTests :: s ~ DynamicCache => RWS () [Test] s ()
 cacheTests = do
