@@ -56,6 +56,8 @@ class HasDynamicCache s where
 instance HasDynamicCache DynamicCache where
   dynamicCache = id
 
+instance DynamicValue DynamicCache
+
 {-
 -- | A map from a type fingerprint ('SomeTypeRep') to a wrapped value ('Dynamic') of that type.
 newtype Dyn s = Dyn s deriving (Generic, Monoid, Semigroup)
@@ -83,6 +85,7 @@ anyLens d =
     _ = callStack
 {-# INLINE anyLens #-}
 
+-- | Unsafe because it omits the DynamicValue a constraint.
 unsafeDynamicLens :: forall a. (Typeable a, HasCallStack) => a -> Lens' DynamicCache a
 unsafeDynamicLens d =
   l1 . l2 . l3
