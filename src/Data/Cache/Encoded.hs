@@ -32,6 +32,7 @@
 
 module Data.Cache.Encoded
   ( EncodedCache(..)
+  , EncodedValue
   , HasEncodedCache(encodedCache)
   , HasEncodedCachePath(encodedCachePath)
   , mapLensE
@@ -104,6 +105,10 @@ instance Semigroup EncodedCache where
   EncodedCache a <> EncodedCache b = EncodedCache (a <> b)
 
 instance Value EncodedCache where hops _ = [NewtypeType]
+
+-- | This allows the types in the cache to be restricted, which
+-- is helps keep track of what might or might not be in there.
+class (Serialize a, SafeCopy a) => EncodedValue a
 
 -- | How to find the encode cache map.
 class HasEncodedCache s where

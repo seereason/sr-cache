@@ -21,6 +21,7 @@ module Data.Cache.Dynamic
   , DynamicValue
   , HasDynamicCache(dynamicCache)
   -- , Dyn(Dyn), dyn
+  , unsafeDynamicLens
   , anyLens
   , maybeLens
   , mapLens, atLens
@@ -77,10 +78,15 @@ dyn = iso (\(Dyn s) -> s) Dyn
 -- @
 anyLens :: forall s a. (HasDynamicCache s, DynamicValue a, HasCallStack) => a -> Lens' s a
 anyLens d =
-  l0 . l1 . l2 . l3
+  dynamicCache @s .  unsafeDynamicLens d
   where
-    l0 :: Lens' s DynamicCache
-    l0 = dynamicCache @s
+    _ = callStack
+{-# INLINE anyLens #-}
+
+unsafeDynamicLens :: forall a. (Typeable a, HasCallStack) => a -> Lens' DynamicCache a
+unsafeDynamicLens d =
+  l1 . l2 . l3
+  where
     l1 :: Lens' DynamicCache (Maybe Dynamic)
     l1 = at (someTypeRep (Proxy @a))
     l2 :: Iso' (Maybe Dynamic) Dynamic
@@ -88,7 +94,7 @@ anyLens d =
     l3 :: Iso' Dynamic a
     l3 = iso (fromMaybe {-(error ("fromDyn @" <> show (typeRep @a)))-} d . fromDynamic) toDyn
     _ = callStack
-{-# INLINE anyLens #-}
+{-# INLINE unsafeDynamicLens #-}
 
 maybeLens :: (HasDynamicCache s, DynamicValue (Maybe a), HasCallStack) => Lens' s (Maybe a)
 maybeLens = anyLens (Nothing :: Maybe a)
