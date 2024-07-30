@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -28,6 +29,10 @@ instance DynamicValue (Map Char Int)
 instance DynamicValue (Map Int Char)
 instance DynamicValue Double
 instance DynamicValue (Maybe Float)
+instance EncodedValue Char Int
+instance EncodedValue Int Char
+instance EncodedValue () Double
+instance EncodedValue () Float
 
 cacheTests :: s ~ DynamicCache => RWS () [Test] s ()
 cacheTests = do

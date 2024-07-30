@@ -108,7 +108,7 @@ instance Value EncodedCache where hops _ = [NewtypeType]
 
 -- | This allows the types in the cache to be restricted, which
 -- is helps keep track of what might or might not be in there.
-class (Serialize a, SafeCopy a) => EncodedValue a
+class (Serialize (Map k v), SafeCopy (Map k v), Ord k, SafeCopy k, SafeCopy v) => EncodedValue k v
 
 -- | How to find the encode cache map.
 class HasEncodedCache s where
@@ -120,7 +120,7 @@ class HasEncodedCachePath s where
 instance HasEncodedCachePath EncodedCache where
   encodedCachePath = upcastOptic idPath
 
-mapLensE :: forall k v. (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => Lens' EncodedCache (Map k v)
+mapLensE :: forall k v. (EncodedValue k v, HasCallStack) => Lens' EncodedCache (Map k v)
 mapLensE =
   l1 . l2
   where
@@ -136,7 +136,7 @@ mapLensE =
 -- > view (anyLens \'a\') $ (anyLens \'a\' %~ succ . succ) (mempty :: Dyn)
 -- \'c\'
 -- @
-atLensE :: forall k v. (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => k -> Lens' EncodedCache (Maybe v)
+atLensE :: forall k v. (EncodedValue k v, HasCallStack) => k -> Lens' EncodedCache (Maybe v)
 atLensE k =
   l1 . l2 . l3
   where
@@ -152,22 +152,22 @@ atLensE k =
 {-# INLINE atLensE #-}
 
 -- | 'anyLens' for a value with a 'Default' instance.
-defaultLensE :: forall k v. (Ord k, SafeCopy k, Eq v, SafeCopy v, Default v, HasCallStack) => k -> Lens' EncodedCache v
+defaultLensE :: forall k v. (Default v, Eq v, EncodedValue k v, HasCallStack) => k -> Lens' EncodedCache v
 defaultLensE k = atLensE @k @v k . non def
 
 -- | 'anyLens' for any value with a 'Bounded' instance.
 boundedLensE ::
-  forall k v. (Ord k, SafeCopy k, SafeCopy v, Bounded v, Eq v, HasCallStack)
+  forall k v. (Bounded v, Eq v, EncodedValue k v, HasCallStack)
   => k -> Lens' EncodedCache v
 boundedLensE k = atLensE @k @v k . non (minBound :: v)
 
 -- | 'anyLens' for any value with a 'Monoid' instance.
 monoidLensE ::
-  forall k v. (Ord k, SafeCopy k, SafeCopy v, Monoid v, Eq v, HasCallStack)
+  forall k v. (Monoid v, Eq v, EncodedValue k v, HasCallStack)
   => k -> Lens' EncodedCache v
 monoidLensE k = atLensE @k @v k . non (mempty :: v)
 
-ixLensE :: forall k v. (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => k -> Traversal' EncodedCache v
+ixLensE :: forall k v. (EncodedValue k v, HasCallStack) => k -> Traversal' EncodedCache v
 ixLensE k = atLensE k . _Just
 
 mapPathE ::
