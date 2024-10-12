@@ -22,7 +22,7 @@
 
 module Data.Cache
   ( HasDynamicCache(dynamicCache), DynamicCache, DynamicValue
-  , HasEncodedCache(encodedCache), EncodedCache
+  , HasEncodedCache, EncodedCache
   , HasEncodedCachePath(encodedCachePath)
   -- , Dyn(Dyn), Enc(Enc)
   -- * For Dynamic

@@ -33,7 +33,7 @@
 module Data.Cache.Encoded
   ( EncodedCache(..)
   , EncodedValue
-  , HasEncodedCache(encodedCache)
+  , HasEncodedCache(encodedCacheUnsafe)
   , HasEncodedCachePath(encodedCachePath)
   , mapLensE
   , atLensE
@@ -47,16 +47,30 @@ module Data.Cache.Encoded
   , updateEncodedMap
   , queryEncodedAt
   , updateEncodedAt
+
+  , getEncoded
+  , useEncoded
+  , askEncoded
+  , viewEncoded
+  , previewEncoded
+  , preuseEncoded
+  , putEncoded
+
+  , recvEncoded
+  , sendEncoded
+  , overEncoded
   ) where
 
 import Control.Exception (ErrorCall)
 import Control.Monad.Catch (MonadCatch, try)
-import Control.Lens (_1, At(at), Iso', iso, _Just, Lens', non, Traversal')
+import Control.Lens (_1, At(at), Iso', iso, _Just, Lens', non, Traversal', use, view, (.=), (%=), Getter, Fold, preview, preuse)
 import Control.Lens.Path
   ((<->), atPath, fstPath, HopType(NewtypeType), idPath, IsGetterTag, newtypePath,
    nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError),
    PathToValue(PathToValue))
-import Control.Monad.Except (MonadError, MonadIO, throwError)
+import Control.Monad.Except (MonadError, MonadIO, throwError, when)
+import Control.Monad.Reader (MonadReader)
+import Control.Monad.State (MonadState)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Data (Data)
@@ -70,7 +84,7 @@ import Data.Serialize (Serialize(get, put))
 import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics (Generic)
-import GHC.Stack (HasCallStack)
+import GHC.Stack (HasCallStack, callStack)
 import SeeReason.Errors as Errors (Member, OneOf, set)
 
 {-
@@ -112,9 +126,10 @@ class (Serialize (Map k v), SafeCopy (Map k v), Ord k, SafeCopy k, SafeCopy v) =
 
 -- | How to find the encode cache map.
 class HasEncodedCache s where
-  encodedCache :: Lens' s EncodedCache
+  encodedCacheUnsafe :: Lens' s EncodedCache
+{-# WARNING encodedCacheUnsafe "Unsafe to use because you might alter the local cache without sending the results to the server" #-}
 instance HasEncodedCache EncodedCache where
-  encodedCache = id
+  encodedCacheUnsafe = id
 class HasEncodedCachePath s where
   encodedCachePath :: PathTo 'L s EncodedCache
 instance HasEncodedCachePath EncodedCache where
@@ -128,6 +143,7 @@ mapLensE =
     l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
     l2 :: Iso' (Map ByteString ByteString) (Map k v)
     l2 = iso decodeMap encodeMap
+    _ = callStack
 
 -- | Given a default, build a lens that points to the value of that
 -- type in the 'EncodedCache'
@@ -149,6 +165,7 @@ atLensE k =
     decode' :: Maybe ByteString -> Maybe v
     decode' (Just bs) = either (\_ -> Nothing {- This should not happen -}) Just (safeDecode bs)
     decode' Nothing = Nothing
+    _ = callStack
 {-# INLINE atLensE #-}
 
 -- | 'anyLens' for a value with a 'Default' instance.
@@ -266,3 +283,84 @@ updateEncodedAt ::
   -> h ()
 updateEncodedAt updateDatumByLens k m =
   updateDatumByLens (PathToValue (encodedCachePath @db <-> atPathE @v k) (fmap safeEncode m))
+
+-- | Retrieve a map entry from the local 'EncodedCache'.
+getEncoded ::
+  forall v k s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
+  => k -> h (Maybe v)
+getEncoded k = use (encodedCacheUnsafe . atLensE @_ @v k)
+
+-- | Retrieve a map entry from the local 'EncodedCache'.
+useEncoded ::
+  forall v k a s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
+  => k -> Getter (Maybe v) a -> h a
+useEncoded k lns = use (encodedCacheUnsafe . atLensE @_ @v k . lns)
+
+-- | Retrieve a map entry from the local 'EncodedCache'.
+askEncoded ::
+  forall v k s h. (MonadReader s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
+  => k -> h (Maybe v)
+askEncoded k = view (encodedCacheUnsafe . atLensE @_ @v k)
+
+-- | Retrieve a map entry from the local 'EncodedCache'.
+viewEncoded ::
+  forall v k a s h. (MonadReader s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
+  => k -> Getter (Maybe v) a -> h a
+viewEncoded k lns = view (encodedCacheUnsafe . atLensE @_ @v k . lns)
+
+-- | Retrieve a map entry from the local 'EncodedCache'.
+previewEncoded ::
+  forall v k a s h. (MonadReader s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
+  => k -> Fold (Maybe v) a -> h (Maybe a)
+previewEncoded k lns = preview (encodedCacheUnsafe . atLensE @_ @v k . lns)
+
+-- | Retrieve a map entry from the local 'EncodedCache'.
+preuseEncoded ::
+  forall v k a s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
+  => k -> Fold (Maybe v) a -> h (Maybe a)
+preuseEncoded k lns = preuse (encodedCacheUnsafe . atLensE @_ @v k . lns)
+
+-- | Set a map entry in the local 'EncodedCache'.  The risk of this
+-- function is making the local cache different from the remote.
+putEncoded ::
+  forall v k s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
+  => k -> Maybe v -> h ()
+putEncoded k mv = encodedCacheUnsafe . atLensE @_ @v k .= mv
+
+-- | Obtain a value from the server and add it to to local cache.
+recvEncoded ::
+  forall v k s h. (EncodedValue k v, HasEncodedCache s, MonadState s h, HasCallStack)
+  => (k -> h (Maybe v)) -> k -> h (Maybe v)
+recvEncoded query k = do
+  mv <- query k
+  putEncoded k mv
+  pure mv
+
+-- | Update the local 'EncodedCache' value and also send it to the
+-- server.  Skip the send when v is unchanged.
+sendEncoded ::
+  forall v k s h. (EncodedValue k v, HasEncodedCache s, MonadState s h, Eq v, HasCallStack)
+  => (k -> Maybe v -> h ()) -- ^ Update the server value
+  -> k
+  -> Maybe v
+  -> h ()
+sendEncoded update k new = do
+  old <- getEncoded @v k
+  when (old /= new) $ do
+    putEncoded k new
+    update k new
+
+-- | Apply a function to some part of v and update the value on the
+-- server.  Skip the send when v is unchanged.
+overEncoded ::
+  forall v k a s h. (EncodedValue k v, HasEncodedCache s, MonadState s h, Eq v, HasCallStack)
+  => (k -> Maybe v -> h ()) -- ^ Update the server value
+  -> k
+  -> Lens' (Maybe v) a
+  -> (a -> a)
+  -> h ()
+overEncoded update k lns f = do
+  old <- getEncoded @v k
+  encodedCacheUnsafe . atLensE @_ @v k . lns %= f
+  new <- getEncoded @v k
+  when (old /= new) (update k new)
