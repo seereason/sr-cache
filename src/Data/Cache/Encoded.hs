@@ -33,16 +33,25 @@
 module Data.Cache.Encoded
   ( EncodedCache(..)
   , EncodedValue
-  , HasEncodedCache(encodedCacheUnsafe)
+  , EncodedValue'
+  , HasEncodedCache(encodedCache)
   , HasEncodedCachePath(encodedCachePath)
-  , mapLensE
-  , atLensE
+
+  -- * Basic encoded cache lenses
+  , mapLensE, mapLensE'
+  , atLensE, atLensE'
+  , ixLensE, ixLensE'
+
   , defaultLensE
   , boundedLensE
   , monoidLensE
-  , ixLensE
   , mapPathE
   , atPathE
+
+  -- * Dynamic cache replacements
+  , mapLens, atLens, ixLens
+  , anyLens, maybeLens
+
   , queryEncodedMap
   , updateEncodedMap
   , queryEncodedAt
@@ -120,20 +129,21 @@ instance Semigroup EncodedCache where
 
 instance Value EncodedCache where hops _ = [NewtypeType]
 
--- | This allows the types in the cache to be restricted, which
--- is helps keep track of what might or might not be in there.
-class (Serialize (Map k v), SafeCopy (Map k v), Ord k, SafeCopy k, SafeCopy v) => EncodedValue k v
-
 -- | How to find the encode cache map.
 class HasEncodedCache s where
-  encodedCacheUnsafe :: Lens' s EncodedCache
-{-# WARNING encodedCacheUnsafe "Unsafe to use because you might alter the local cache without sending the results to the server" #-}
+  encodedCache :: Lens' s EncodedCache
 instance HasEncodedCache EncodedCache where
-  encodedCacheUnsafe = id
+  encodedCache = id
 class HasEncodedCachePath s where
   encodedCachePath :: PathTo 'L s EncodedCache
 instance HasEncodedCachePath EncodedCache where
   encodedCachePath = upcastOptic idPath
+
+-- | This allows the types in the cache to be restricted, which
+-- is helps keep track of what might or might not be in there.
+class (SafeCopy k, Ord k, SafeCopy v) => EncodedValue k v
+
+type EncodedValue' k v s = (EncodedValue k v, HasEncodedCache s)
 
 mapLensE :: forall k v. (EncodedValue k v, HasCallStack) => Lens' EncodedCache (Map k v)
 mapLensE =
@@ -144,6 +154,12 @@ mapLensE =
     l2 :: Iso' (Map ByteString ByteString) (Map k v)
     l2 = iso decodeMap encodeMap
     _ = callStack
+
+mapLensE' :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => Lens' s (Map k v)
+mapLensE' = encodedCache . mapLensE @k @v
+
+mapLens :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => Lens' s (Map k v)
+mapLens = mapLensE'
 
 -- | Given a default, build a lens that points to the value of that
 -- type in the 'EncodedCache'
@@ -168,6 +184,18 @@ atLensE k =
     _ = callStack
 {-# INLINE atLensE #-}
 
+atLensE' :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Lens' s (Maybe v)
+atLensE' k = encodedCache . atLensE @k @v k
+
+atLens :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Lens' s (Maybe v)
+atLens = atLensE'
+
+anyLens :: forall s a. (EncodedValue' () a s, Eq a, HasCallStack) => a -> Lens' s a
+anyLens d = atLens () . non d
+
+maybeLens :: forall s a. (EncodedValue' () (Maybe a) s, Eq a, HasCallStack) => Lens' s (Maybe a)
+maybeLens = anyLens (Nothing :: Maybe a)
+
 -- | 'anyLens' for a value with a 'Default' instance.
 defaultLensE :: forall k v. (Default v, Eq v, EncodedValue k v, HasCallStack) => k -> Lens' EncodedCache v
 defaultLensE k = atLensE @k @v k . non def
@@ -186,6 +214,12 @@ monoidLensE k = atLensE @k @v k . non (mempty :: v)
 
 ixLensE :: forall k v. (EncodedValue k v, HasCallStack) => k -> Traversal' EncodedCache v
 ixLensE k = atLensE k . _Just
+
+ixLensE' :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Traversal' s v
+ixLensE' k = encodedCache . ixLensE @k @v k
+
+ixLens :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Traversal' s v
+ixLens = ixLensE'
 
 mapPathE ::
   forall k v. (SafeCopy k, SafeCopy v, HasCallStack)
@@ -288,44 +322,44 @@ updateEncodedAt updateDatumByLens k m =
 getEncoded ::
   forall v k s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
   => k -> h (Maybe v)
-getEncoded k = use (encodedCacheUnsafe . atLensE @_ @v k)
+getEncoded k = use (encodedCache . atLensE @_ @v k)
 
 -- | Retrieve a map entry from the local 'EncodedCache'.
 useEncoded ::
   forall v k a s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
   => k -> Getter (Maybe v) a -> h a
-useEncoded k lns = use (encodedCacheUnsafe . atLensE @_ @v k . lns)
+useEncoded k lns = use (encodedCache . atLensE @_ @v k . lns)
 
 -- | Retrieve a map entry from the local 'EncodedCache'.
 askEncoded ::
   forall v k s h. (MonadReader s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
   => k -> h (Maybe v)
-askEncoded k = view (encodedCacheUnsafe . atLensE @_ @v k)
+askEncoded k = view (encodedCache . atLensE @_ @v k)
 
 -- | Retrieve a map entry from the local 'EncodedCache'.
 viewEncoded ::
   forall v k a s h. (MonadReader s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
   => k -> Getter (Maybe v) a -> h a
-viewEncoded k lns = view (encodedCacheUnsafe . atLensE @_ @v k . lns)
+viewEncoded k lns = view (encodedCache . atLensE @_ @v k . lns)
 
 -- | Retrieve a map entry from the local 'EncodedCache'.
 previewEncoded ::
   forall v k a s h. (MonadReader s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
   => k -> Fold (Maybe v) a -> h (Maybe a)
-previewEncoded k lns = preview (encodedCacheUnsafe . atLensE @_ @v k . lns)
+previewEncoded k lns = preview (encodedCache . atLensE @_ @v k . lns)
 
 -- | Retrieve a map entry from the local 'EncodedCache'.
 preuseEncoded ::
   forall v k a s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
   => k -> Fold (Maybe v) a -> h (Maybe a)
-preuseEncoded k lns = preuse (encodedCacheUnsafe . atLensE @_ @v k . lns)
+preuseEncoded k lns = preuse (encodedCache . atLensE @_ @v k . lns)
 
 -- | Set a map entry in the local 'EncodedCache'.  The risk of this
 -- function is making the local cache different from the remote.
 putEncoded ::
   forall v k s h. (MonadState s h, EncodedValue k v, HasEncodedCache s, HasCallStack)
   => k -> Maybe v -> h ()
-putEncoded k mv = encodedCacheUnsafe . atLensE @_ @v k .= mv
+putEncoded k mv = encodedCache . atLensE @_ @v k .= mv
 
 -- | Obtain a value from the server and add it to to local cache.
 recvEncoded ::
@@ -335,6 +369,21 @@ recvEncoded query k = do
   mv <- query k
   putEncoded k mv
   pure mv
+
+-- | Copy the EncodedCache from the server into MyView.  This should
+-- actually copy a value associated with the effective or logged user.
+-- WARNING: the only gets loaded once, if the value on the server is
+-- changed by another client, the client this is running in will not
+-- know.
+recvEncodedCache ::
+  forall db s h.
+  (MonadState s h,
+   HasEncodedCache s,
+   -- HasEncodedCachePath db,
+   HasCallStack) => h EncodedCache -> h ()
+recvEncodedCache query =
+  (.=) encodedCache =<< query
+  where _ = callStack
 
 -- | Update the local 'EncodedCache' value and also send it to the
 -- server.  Skip the send when v is unchanged.
@@ -361,6 +410,6 @@ overEncoded ::
   -> h ()
 overEncoded update k lns f = do
   old <- getEncoded @v k
-  encodedCacheUnsafe . atLensE @_ @v k . lns %= f
+  encodedCache . atLensE @_ @v k . lns %= f
   new <- getEncoded @v k
   when (old /= new) (update k new)
