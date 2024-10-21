@@ -33,7 +33,7 @@
 module Data.Cache.Encoded
   ( EncodedCache(..)
   , EncodedValue
-  , EncodedValue'
+  , EncodedValueIn
   , HasEncodedCache(encodedCache)
   , HasEncodedCachePath(encodedCachePath)
 
@@ -47,10 +47,6 @@ module Data.Cache.Encoded
   , monoidLensE
   , mapPathE
   , atPathE
-
-  -- * Dynamic cache replacements
-  , mapLens, atLens, ixLens
-  , anyLens, maybeLens
 
   , queryEncodedMap
   , updateEncodedMap
@@ -143,7 +139,7 @@ instance HasEncodedCachePath EncodedCache where
 -- is helps keep track of what might or might not be in there.
 class (SafeCopy k, Ord k, SafeCopy v) => EncodedValue k v
 
-type EncodedValue' k v s = (EncodedValue k v, HasEncodedCache s)
+type EncodedValueIn k v s = (EncodedValue k v, HasEncodedCache s)
 
 mapLensE :: forall k v. (EncodedValue k v, HasCallStack) => Lens' EncodedCache (Map k v)
 mapLensE =
@@ -158,9 +154,6 @@ mapLensE =
 mapLensE' :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => Lens' s (Map k v)
 mapLensE' = encodedCache . mapLensE @k @v
 
-mapLens :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => Lens' s (Map k v)
-mapLens = mapLensE'
-
 -- | Given a default, build a lens that points to the value of that
 -- type in the 'EncodedCache'
 --
@@ -170,31 +163,18 @@ mapLens = mapLensE'
 -- @
 atLensE :: forall k v. (EncodedValue k v, HasCallStack) => k -> Lens' EncodedCache (Maybe v)
 atLensE k =
-  l1 . l2 . l3
+  -- Lens' EncodedCache (Map ByteString ByteString)
+  #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1 .
+  -- Lens' (Map ByteString ByteString) (Maybe ByteString)
+  at (safeEncode k) .
+  -- Iso' (Maybe ByteString) (Maybe v)
+  iso (maybe Nothing (either (\_ -> Nothing) Just . safeDecode)) (fmap safeEncode)
   where
-    l1 :: Lens' EncodedCache (Map ByteString ByteString)
-    l1 = #unEncodedCache . at (typeRepFingerprint (typeRep (Proxy @(Map k v)))) . non mempty . _1
-    l2 :: Lens' (Map ByteString ByteString) (Maybe ByteString)
-    l2 = at (safeEncode k)
-    l3 :: Iso' (Maybe ByteString) (Maybe v)
-    l3 = iso decode' (fmap safeEncode)
-    decode' :: Maybe ByteString -> Maybe v
-    decode' (Just bs) = either (\_ -> Nothing {- This should not happen -}) Just (safeDecode bs)
-    decode' Nothing = Nothing
     _ = callStack
 {-# INLINE atLensE #-}
 
 atLensE' :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Lens' s (Maybe v)
 atLensE' k = encodedCache . atLensE @k @v k
-
-atLens :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Lens' s (Maybe v)
-atLens = atLensE'
-
-anyLens :: forall s a. (EncodedValue' () a s, Eq a, HasCallStack) => a -> Lens' s a
-anyLens d = atLens () . non d
-
-maybeLens :: forall s a. (EncodedValue' () (Maybe a) s, Eq a, HasCallStack) => Lens' s (Maybe a)
-maybeLens = anyLens (Nothing :: Maybe a)
 
 -- | 'anyLens' for a value with a 'Default' instance.
 defaultLensE :: forall k v. (Default v, Eq v, EncodedValue k v, HasCallStack) => k -> Lens' EncodedCache v
@@ -217,9 +197,6 @@ ixLensE k = atLensE k . _Just
 
 ixLensE' :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Traversal' s v
 ixLensE' k = encodedCache . ixLensE @k @v k
-
-ixLens :: forall k v s. (HasEncodedCache s, EncodedValue k v, HasCallStack) => k -> Traversal' s v
-ixLens = ixLensE'
 
 mapPathE ::
   forall k v. (SafeCopy k, SafeCopy v, HasCallStack)
@@ -257,12 +234,12 @@ queryEncodedMap queryDatumByGetter =
       Left (e :: ErrorCall) -> throwError (Errors.set (PathError (show e)))
       Right m -> pure m
 
-decodeMap :: (Ord k, SafeCopy k, SafeCopy v) => Map ByteString ByteString -> Map k v
+decodeMap :: (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => Map ByteString ByteString -> Map k v
 decodeMap =
   fmap (fromRight (error "decode error") . safeDecode) .
   mapKeys (fromRight (error "decode error") . safeDecode)
 
-encodeMap :: (SafeCopy k, SafeCopy v) => Map k v -> Map ByteString ByteString
+encodeMap :: (SafeCopy k, SafeCopy v, HasCallStack) => Map k v -> Map ByteString ByteString
 encodeMap = fmap safeEncode . mapKeys safeEncode
 
 -- | Send the encoded cache content for type a to the server.
@@ -376,7 +353,7 @@ recvEncoded query k = do
 -- changed by another client, the client this is running in will not
 -- know.
 recvEncodedCache ::
-  forall db s h.
+  forall s h.
   (MonadState s h,
    HasEncodedCache s,
    -- HasEncodedCachePath db,

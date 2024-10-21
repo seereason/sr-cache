@@ -19,6 +19,9 @@
 module Data.Cache.Dynamic
   ( DynamicCache
   , DynamicValue
+  , DynamicValueIn
+  , DynamicMapValue
+  , DynamicMapValueIn
   , HasDynamicCache(dynamicCache)
   -- , Dyn(Dyn), dyn
   , unsafeDynamicLens
@@ -46,15 +49,19 @@ import Type.Reflection (SomeTypeRep, someTypeRep)
 
 type DynamicCache = Map SomeTypeRep Dynamic
 
--- | This allows the types in the cache to be restricted, which
--- is helps keep track of what might or might not be in there.
-class Typeable a => DynamicValue a
-
 -- | How to find the dynamic cache map.
 class HasDynamicCache s where
   dynamicCache :: Lens' s DynamicCache
 instance HasDynamicCache DynamicCache where
   dynamicCache = id
+
+-- | This allows the types in the cache to be restricted, which
+-- is helps keep track of what might or might not be in there.
+class Typeable a => DynamicValue a
+
+type DynamicMapValue k v = (DynamicValue (Map k v), Ord k)
+type DynamicValueIn a s = (DynamicValue a, HasDynamicCache s)
+type DynamicMapValueIn k v s = (DynamicMapValue k v, HasDynamicCache s)
 
 instance DynamicValue DynamicCache
 
