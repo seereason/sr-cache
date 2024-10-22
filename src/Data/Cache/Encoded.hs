@@ -130,10 +130,10 @@ class HasEncodedCache s where
   encodedCache :: Lens' s EncodedCache
 instance HasEncodedCache EncodedCache where
   encodedCache = id
-class HasEncodedCachePath s where
-  encodedCachePath :: PathTo 'L s EncodedCache
-instance HasEncodedCachePath EncodedCache where
-  encodedCachePath = upcastOptic idPath
+class HasEncodedCachePath uid s where
+  encodedCachePath :: uid -> PathTo 'L s EncodedCache
+instance (Ord uid, Serialize uid) => HasEncodedCachePath uid (Map uid EncodedCache) where
+  encodedCachePath uid = atPath uid <-> nonPath mempty
 
 -- | This allows the types in the cache to be restricted, which
 -- is helps keep track of what might or might not be in there.
@@ -217,9 +217,9 @@ atPathE k = mapPathE @k @v <-> fstPath <-> atPath (safeEncode k)
 
 -- | Retrieve the encoded cache content for type a from the server.
 queryEncodedMap ::
-  forall db k v h e.
+  forall db k v h e uid.
   (MonadCatch h,
-   HasEncodedCachePath db,
+   HasEncodedCachePath uid db,
    Member PathError e,
    MonadError (OneOf e) h,
    Ord k,
@@ -227,9 +227,10 @@ queryEncodedMap ::
    SafeCopy v,
    HasCallStack)
   => (forall o b. (Value b, IsGetterTag o) => PathTo o db b -> h b)
+  -> uid
   -> h (Map k v)
-queryEncodedMap queryDatumByGetter =
-  queryDatumByGetter (encodedCachePath @db <-> mapPathE @k @v <-> fstPath) >>= \bs ->
+queryEncodedMap queryDatumByGetter uid =
+  queryDatumByGetter (encodedCachePath @_ @db uid <-> mapPathE @k @v <-> fstPath) >>= \bs ->
     try (pure $ decodeMap bs) >>= \case
       Left (e :: ErrorCall) -> throwError (Errors.set (PathError (show e)))
       Right m -> pure m
@@ -244,37 +245,39 @@ encodeMap = fmap safeEncode . mapKeys safeEncode
 
 -- | Send the encoded cache content for type a to the server.
 updateEncodedMap ::
-  forall db k v h.
-  (HasEncodedCachePath db,
+  forall db k v h uid.
+  (HasEncodedCachePath uid db,
    SafeCopy k,
    SafeCopy v,
    HasCallStack)
   => (forall b. Value b => PathToValue 'L db b -> h ())
+  -> uid
   -> Map k v
   -> h ()
-updateEncodedMap updateDatumByLens m =
+updateEncodedMap updateDatumByLens uid m =
   updateDatumByLens (PathToValue
-                      (encodedCachePath @db <-> mapPathE @k @v <-> fstPath)
+                      (encodedCachePath @_ @db uid <-> mapPathE @k @v <-> fstPath)
                       (fmap safeEncode (mapKeys safeEncode m)))
 
 -- | Retrieve the encoded cache content for type a from the server.
 queryEncodedAt ::
-  forall db k v h e.
+  forall db k v h e uid.
   (Monad h,
    MonadIO h,
    -- Value db,
    -- EventHandler h,
-   HasEncodedCachePath db,
+   HasEncodedCachePath uid db,
    Member PathError e,
    MonadError (OneOf e) h,
    SafeCopy k,
    SafeCopy v,
    HasCallStack)
   => (forall b o. (Value b, IsGetterTag o) => PathTo o db b -> h b)
+  -> uid
   -> k
   -> h (Maybe v)
-queryEncodedAt queryDatumByGetter k =
-  queryDatumByGetter (encodedCachePath @db <-> atPathE @v k) >>= \case
+queryEncodedAt queryDatumByGetter uid k =
+  queryDatumByGetter (encodedCachePath @_ @db uid <-> atPathE @v k) >>= \case
     Nothing -> pure Nothing                             -- is a clean
     Just bs ->
       case safeDecode bs of
@@ -283,17 +286,18 @@ queryEncodedAt queryDatumByGetter k =
 
 -- | Send the encoded cache content for type a to the server.
 updateEncodedAt ::
-  forall db k v h.
-  (HasEncodedCachePath db,
+  forall db k v h uid.
+  (HasEncodedCachePath uid db,
    SafeCopy k,
    SafeCopy v,
    HasCallStack)
   => (forall b. Value b => PathToValue 'L db b -> h ())
+  -> uid
   -> k
   -> Maybe v
   -> h ()
-updateEncodedAt updateDatumByLens k m =
-  updateDatumByLens (PathToValue (encodedCachePath @db <-> atPathE @v k) (fmap safeEncode m))
+updateEncodedAt updateDatumByLens uid k m =
+  updateDatumByLens (PathToValue (encodedCachePath @_ @db uid <-> atPathE @v k) (fmap safeEncode m))
 
 -- | Retrieve a map entry from the local 'EncodedCache'.
 getEncoded ::
