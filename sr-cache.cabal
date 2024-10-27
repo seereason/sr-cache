@@ -26,7 +26,7 @@ Library
     lens-path >= 3.31,
     mtl,
     safecopy,
-    sr-errors,
+    sr-errors >= 1.13,
     sr-utils
   Exposed-Modules:
     Data.Cache.Common

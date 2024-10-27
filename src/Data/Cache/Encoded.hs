@@ -90,7 +90,7 @@ import Data.Typeable (Typeable, typeRep, typeRepFingerprint)
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack, callStack)
-import SeeReason.Errors as Errors (Member, OneOf, set)
+import SeeReason.Errors as Errors (Member, OneOf, put1)
 
 {-
 -- | A map from a type fingerprint ('Fingerprint') to a wrapped value ('ByteString') of that type.
@@ -232,7 +232,7 @@ queryEncodedMap ::
 queryEncodedMap queryDatumByGetter uid =
   queryDatumByGetter (encodedCachePath @_ @db uid <-> mapPathE @k @v <-> fstPath) >>= \bs ->
     try (pure $ decodeMap bs) >>= \case
-      Left (e :: ErrorCall) -> throwError (Errors.set (PathError (show e)))
+      Left (e :: ErrorCall) -> throwError (Errors.put1 (PathError (show e)))
       Right m -> pure m
 
 decodeMap :: (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => Map ByteString ByteString -> Map k v
@@ -281,7 +281,7 @@ queryEncodedAt queryDatumByGetter uid k =
     Nothing -> pure Nothing                             -- is a clean
     Just bs ->
       case safeDecode bs of
-        Left s -> throwError (Errors.set (PathError s)) -- is a dirty
+        Left s -> throwError (Errors.put1 (PathError s)) -- is a dirty
         Right m -> pure (Just m)                        -- is a clean
 
 -- | Send the encoded cache content for type a to the server.
