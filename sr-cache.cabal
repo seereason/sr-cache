@@ -23,7 +23,7 @@ Library
     generic-lens,
     HUnit,
     lens,
-    lens-path >= 3.31,
+    lens-path >= 3.41,
     mtl,
     safecopy,
     sr-errors >= 1.13,

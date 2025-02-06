@@ -70,8 +70,8 @@ import Control.Exception (ErrorCall)
 import Control.Monad.Catch (MonadCatch, try)
 import Control.Lens (_1, At(at), Iso', iso, _Just, Lens', non, Traversal', use, view, (.=), (%=), Getter, Fold, preview, preuse)
 import Control.Lens.Path
-  ((<->), atPath, fstPath, HopType(NewtypeType), idPath, IsGetterTag, newtypePath,
-   nonPath, upcastOptic, PathTo, OpticTag(L), Value(hops), PathError(PathError),
+  ((<->), atPath, fstPath, HopType(NewtypeType), IsGetterTag, newtypePath,
+   nonPath, PathTo, OpticTag(L), Value(hops), PathError(PathError),
    PathToValue(PathToValue))
 import Control.Monad.Except (MonadError, MonadIO, throwError, when)
 import Control.Monad.Reader (MonadReader)
@@ -232,7 +232,7 @@ queryEncodedMap ::
 queryEncodedMap queryDatumByGetter uid =
   queryDatumByGetter (encodedCachePath @_ @db uid <-> mapPathE @k @v <-> fstPath) >>= \bs ->
     try (pure $ decodeMap bs) >>= \case
-      Left (e :: ErrorCall) -> throwError (Errors.put1 (PathError (show e)))
+      Left (e :: ErrorCall) -> throwError (Errors.put1 (PathError (show e) callStack))
       Right m -> pure m
 
 decodeMap :: (Ord k, SafeCopy k, SafeCopy v, HasCallStack) => Map ByteString ByteString -> Map k v
@@ -281,7 +281,7 @@ queryEncodedAt queryDatumByGetter uid k =
     Nothing -> pure Nothing                             -- is a clean
     Just bs ->
       case safeDecode bs of
-        Left s -> throwError (Errors.put1 (PathError s)) -- is a dirty
+        Left s -> throwError (Errors.put1 (PathError s callStack)) -- is a dirty
         Right m -> pure (Just m)                        -- is a clean
 
 -- | Send the encoded cache content for type a to the server.
