@@ -39,7 +39,7 @@ traceIf p s a = bool a (trace (s a) a) (p a)
 safeEncode :: (SafeCopy a, HasCallStack) => a -> ByteString
 safeEncode a =
   traceIf
-    (\bs -> False {-length bs > 1000-})
+    (\_ -> False {-length bs > 1000-})
     (\bs -> "safeEncode " <> show (length bs) <> " bytes (" <> compactStack (getCallStack callStack) <> ")")
     (runPut (safePut a))
 
