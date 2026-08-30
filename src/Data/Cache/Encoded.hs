@@ -73,9 +73,11 @@ import Control.Lens.Path
   ((<->), atPath, fstPath, HopType(NewtypeType), IsGetterTag, newtypePath,
    nonPath, PathTo, OpticTag(L), Value(hops), PathError(PathError),
    PathToValue(PathToValue))
-import Control.Monad.Except (MonadError, MonadIO, throwError, when)
+import Control.Monad (when)
+import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader)
 import Control.Monad.State (MonadState)
+import Control.Monad.Trans (MonadIO)
 import Data.ByteString (ByteString)
 import Data.Cache.Common (safeDecode, safeEncode)
 import Data.Data (Data)
