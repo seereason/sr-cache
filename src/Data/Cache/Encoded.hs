@@ -264,11 +264,7 @@ updateEncodedMap updateDatumByLens uid m =
 -- | Retrieve the encoded cache content for type a from the server.
 queryEncodedAt ::
   forall db k v h e uid.
-  (Monad h,
-   MonadIO h,
-   -- Value db,
-   -- EventHandler h,
-   HasEncodedCachePath uid db,
+  (HasEncodedCachePath uid db,
    Member PathError e,
    MonadError (OneOf e) h,
    SafeCopy k,
