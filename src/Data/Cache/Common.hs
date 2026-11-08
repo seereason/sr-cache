@@ -27,7 +27,6 @@ import Data.SafeCopy (SafeCopy, safeGet, safePut)
 import Data.Serialize (runPut, runGet, Serialize)
 import Data.String (IsString(fromString))
 import Debug.Trace (trace)
-import GHC.Generics
 import GHC.Fingerprint (Fingerprint(..))
 import GHC.Stack (callStack, getCallStack, HasCallStack, SrcLoc(..))
 import Prelude hiding (length)
